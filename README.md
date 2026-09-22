@@ -1,342 +1,410 @@
 # AttackLens
 
-**Local attack surface and attack path analyzer for hosts and Docker environments.**
+AttackLens is a self-hosted cybersecurity scanner designed to identify security issues on personal machines and servers.
 
-AttackLens analyzes a host locally and builds a contextual security model by correlating network exposure, running services, system configuration, containers, and known vulnerabilities.
+The project combines a Python-based scanning engine with a web dashboard to provide a clear view of detected security findings.
 
-The goal is not to replace existing security tools such as Nmap, Greenbone, Lynis, or Trivy. Instead, AttackLens uses information from these tools and from the host itself to identify relationships between components and potential attack paths.
+> **Status:** Early development — MVP
 
-> **Detecting a vulnerability is not enough. AttackLens aims to understand how that vulnerability fits into the security context of the host.**
+## Overview
 
----
+AttackLens is designed to progressively cover several areas of system security:
 
-## Why AttackLens?
+* Network exposure
+* System configuration
+* Docker security
+* Web and TLS configuration
+* Vulnerability and CVE analysis
+* Security posture monitoring
 
-Security scanners often produce isolated findings:
-
-```text
-Open port
-Vulnerable package
-Weak configuration
-Exposed container
-```
-
-AttackLens tries to connect these findings:
-
-```mermaid
-flowchart LR
-    Internet --> Endpoint["Exposed endpoint"]
-    Endpoint --> Service["Network service"]
-    Service --> Process["Running process"]
-    Process --> Package["Installed package"]
-    Package --> Vulnerability["Known vulnerability"]
-```
-
-This makes it possible to reason about potential attack paths rather than treating every finding independently.
-
-For example:
-
-```mermaid
-flowchart TD
-    Internet --> SSH["SSH :22"]
-    SSH --> Auth["Password authentication"]
-    Auth --> User["User account"]
-    User --> Privilege["Elevated privileges"]
-```
-
-The objective is to determine whether such relationships actually exist on the analyzed host and provide the evidence supporting them.
-
----
-
-## Core principles
-
-### Local-first
-
-Collected security information stays on the analyzed machine.
-
-```mermaid
-flowchart LR
-    Host["Analyzed host"]
-    Scanner["AttackLens scanner"]
-    Model["Security model"]
-    Database["Local database"]
-    Dashboard["Local dashboard"]
-
-    Host --> Scanner
-    Scanner --> Model
-    Model --> Database
-    Database --> Dashboard
-
-    Dashboard -. "No external transmission" .- Internet["Internet"]
-```
-
-The core application does not require a cloud service or remote backend.
-
-### Least privilege
-
-The scanner should operate without root privileges whenever possible.
-
-Privileged operations, if eventually required, should be isolated and explicitly justified rather than running the entire application as root.
-
-### Evidence-based analysis
-
-Every security finding should be traceable to collected evidence.
-
-```text
-Finding
-   │
-   ├── Evidence: exposed port
-   ├── Evidence: running service
-   ├── Evidence: affected package
-   └── Evidence: reachable component
-```
-
-### Existing tools over reinvention
-
-AttackLens is not intended to reimplement mature security tools.
-
-```mermaid
-flowchart LR
-    Nmap["Nmap"]
-    OS["Host information"]
-    Docker["Docker"]
-    Packages["Package manager"]
-    Logs["System logs"]
-
-    Nmap --> Normalize["Normalization"]
-    OS --> Normalize
-    Docker --> Normalize
-    Packages --> Normalize
-    Logs --> Normalize
-
-    Normalize --> Model["Security model"]
-    Model --> Analysis["Correlation & attack-path analysis"]
-```
-
----
-
-## What AttackLens is not
-
-AttackLens is **not** intended to become:
-
-* a SIEM
-* an IDS/IPS
-* an antivirus
-* a replacement for Nmap
-* a replacement for Greenbone/OpenVAS
-* a replacement for Lynis
-* a general-purpose vulnerability scanner
-* a cloud security platform
-
-Its purpose is **contextual host security analysis and attack-path identification**.
-
----
-
-## Initial scope
-
-The first version focuses on a single host.
-
-### Attack surface
-
-* Network interfaces
-* Listening ports
-* Network services
-* Firewall state
-* Processes
-
-### System context
-
-* Operating system
-* Installed packages
-* Running services
-* Users and privileges
-* Docker environments
-
-### Vulnerability context
-
-* Installed vulnerable packages
-* CVEs
-* Affected versions
-* Fixed versions
-* Vulnerability metadata
-
-### Security relationships
-
-AttackLens will model relationships such as:
-
-```mermaid
-flowchart TD
-    Host
-    Network
-    Endpoint
-    Service
-    Process
-    Package
-    Container
-    User
-    Vulnerability
-
-    Network --> Endpoint
-    Endpoint --> Service
-    Service --> Process
-    Process --> Package
-    Service --> Container
-    Container --> Process
-    Process --> User
-    Package --> Vulnerability
-```
-
-### Attack paths
-
-The analysis engine will use these relationships to identify potential paths such as:
-
-```mermaid
-flowchart LR
-    Internet --> Endpoint
-    Endpoint --> Service
-    Service --> Container
-    Container --> VulnerablePackage["Vulnerable package"]
-    VulnerablePackage --> Impact["Potential impact"]
-```
-
----
+The current MVP focuses on **network service discovery** and provides a web dashboard for viewing scan results.
 
 ## Architecture
 
-The initial architecture intentionally contains as few components as possible.
+```text
+                         AttackLens
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+              Scanner                  Dashboard
+                 │                         │
+          Python / CLI              Nuxt / Vue
+                 │                         │
+                 ▼                         │
+        results/latest.json               │
+                 │                         │
+                 ▼                         │
+             FastAPI API ◄────────────────┘
+                 │
+               :8000
 
-```mermaid
-flowchart TB
-    subgraph Host["Analyzed host"]
-        Scanner["AttackLens scanner"]
-
-        subgraph Collectors["Local collectors"]
-            Network["Network"]
-            System["System"]
-            Services["Services"]
-            Packages["Packages"]
-            Docker["Docker"]
-        end
-
-        Model["Security model"]
-        Analysis["Correlation & attack-path analysis"]
-        DB[("SQLite")]
-
-        Scanner --> Collectors
-        Collectors --> Model
-        Model --> Analysis
-        Analysis --> DB
-    end
-
-    DB --> Dashboard["Local dashboard"]
+Dashboard
+   │
+   └── :3000
 ```
 
-The scanner runs directly on the host because it needs to inspect the host itself.
+The current data flow is:
 
-The dashboard is intentionally separated from the scanner and does not require privileged access to the host.
+```text
+CLI
+ ↓
+Network Scanner
+ ↓
+Finding[]
+ ↓
+results/latest.json
+ ↓
+FastAPI
+ ↓
+Nuxt Dashboard
+```
 
----
+## Project Structure
 
-## Technology
+```text
+Attack-lens/
+├── frontend/
+│   ├── app/
+│   │   ├── app.vue
+│   │   └── pages/
+│   │       └── index.vue
+│   ├── public/
+│   ├── Dockerfile
+│   ├── nuxt.config.ts
+│   ├── package.json
+│   └── package-lock.json
+│
+├── src/
+│   └── attacklens/
+│       ├── web/
+│       │   └── api.py
+│       ├── __init__.py
+│       ├── cli.py
+│       ├── models.py
+│       ├── results.py
+│       └── scanner.py
+│
+├── tests/
+│   ├── test_cli.py
+│   ├── test_models.py
+│   ├── test_results.py
+│   └── test_scanner.py
+│
+├── results/
+│   └── .gitkeep
+│
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+├── README.md
+└── SECURITY.md
+```
 
-### Scanner
+## Current Features
 
-* Python 3.12+
-* psutil
-* Native Linux interfaces and commands
-* Nmap where appropriate
-* Docker API where appropriate
+### Network scanning
 
-### Storage
+The current scanner checks common TCP ports on a target host and reports detected services.
 
-* SQLite
+Currently supported examples include:
+
+* SSH
+* FTP
+* Telnet
+* HTTP / HTTPS
+* SMTP
+* DNS
+* SMB
+* MySQL
+* PostgreSQL
+* Redis
+
+Each detected service is represented as a security finding containing:
+
+* Category
+* Severity
+* Title
+* Description
+* Evidence
+* Remediation
+* References
+
+### Scan result persistence
+
+Scan results are currently stored in:
+
+```text
+results/latest.json
+```
+
+This provides a simple interface between the scanner and the web dashboard while the project is still in its MVP stage.
+
+### Web API
+
+The FastAPI backend currently exposes:
+
+```text
+GET /api/health
+GET /api/results
+```
+
+`/api/health` provides a basic API health check.
+
+`/api/results` returns the latest stored scan results.
 
 ### Dashboard
 
-Planned for a later milestone:
+The Nuxt dashboard currently provides:
 
-* FastAPI
-* React
-* TypeScript
+* Target information
+* Finding count
+* Severity counts
+* Latest scan information
+* Detected findings
+* Evidence for each finding
 
-### Development
+The dashboard is intentionally kept lightweight during the MVP to make the architecture easy to evolve.
 
-* pytest
-* Ruff
-* GitHub Actions
-
----
-
-## Project status
-
-AttackLens is currently in early development.
-
-The first milestone is intentionally small:
-
-1. Establish the scanner CLI
-2. Collect local system information
-3. Collect network exposure
-4. Normalize collected information
-5. Build the first security model
-6. Detect the first relationships
-7. Implement the first attack-path rules
-
-The web dashboard will be developed after the underlying security model is stable.
-
----
-
-## Development
+## Installation
 
 ### Requirements
 
 * Python 3.12+
-* Linux for the initial scanner implementation
+* Node.js 22+
+* npm
+* Git
 
-### Installation
+### Clone the repository
 
-Clone the repository and create a virtual environment:
+```bash
+git clone https://github.com/Gemukii/Attack-lens.git
+cd Attack-lens
+```
+
+### Python environment
+
+Create a virtual environment:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+```
+
+Activate it on Windows:
+
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
 Install AttackLens in editable mode:
 
 ```bash
-pip install -e ".[dev]"
+python -m pip install -e .
 ```
 
-### Run
+## Running a Scan
+
+Run a network scan against localhost:
 
 ```bash
-attacklens
+python -m attacklens.cli scan --network
 ```
 
-### Tests
+Specify another target:
+
+```bash
+python -m attacklens.cli scan --network --host 192.168.1.10
+```
+
+Output results as JSON:
+
+```bash
+python -m attacklens.cli scan --network --json
+```
+
+The scan automatically saves its results to:
+
+```text
+results/latest.json
+```
+
+## Running the API
+
+Start the FastAPI backend:
+
+```bash
+uvicorn attacklens.web.api:app --reload
+```
+
+The API will be available at:
+
+```text
+http://localhost:8000
+```
+
+Health check:
+
+```text
+http://localhost:8000/api/health
+```
+
+Results:
+
+```text
+http://localhost:8000/api/results
+```
+
+## Running the Dashboard
+
+Install the frontend dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+Start the Nuxt development server:
+
+```bash
+npm run dev
+```
+
+The dashboard will be available at:
+
+```text
+http://localhost:3000
+```
+
+The dashboard retrieves scan results from the FastAPI backend.
+
+## Docker
+
+AttackLens can also be started using Docker Compose.
+
+From the project root:
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+| Service   |   Port | Description        |
+| --------- | -----: | ------------------ |
+| Dashboard | `3000` | Nuxt web interface |
+| API       | `8000` | FastAPI backend    |
+
+The `results/` directory is shared with the API container so that scan results generated by the CLI can be displayed by the dashboard.
+
+## Testing
+
+Run the test suite with:
 
 ```bash
 pytest
 ```
 
-### Lint
+The tests currently cover:
 
-```bash
-ruff check .
-```
-
----
+* Data models
+* Network scanner
+* CLI argument parsing
+* Result persistence
 
 ## Security
 
-AttackLens can process sensitive information about a host, including network exposure, installed software, processes, services, containers, and security configuration.
+AttackLens is intended for systems that you own or are explicitly authorized to assess.
 
-For this reason, security is considered a core project requirement.
+Do not use the scanner against systems without permission.
 
-See [`SECURITY.md`](SECURITY.md) for the security policy and design principles.
+See [`SECURITY.md`](SECURITY.md) for vulnerability reporting information.
 
----
+## Roadmap
+
+### MVP
+
+* [x] Python project structure
+* [x] Finding data model
+* [x] Basic network scanner
+* [x] CLI
+* [x] JSON result persistence
+* [x] FastAPI backend
+* [x] Initial Nuxt dashboard
+* [ ] Docker Compose integration
+* [ ] Complete dashboard/API integration
+
+### Network security
+
+* [ ] Local listening service discovery
+* [ ] Windows network inspection
+* [ ] Linux network inspection
+* [ ] Service and version detection
+* [ ] Network interface information
+* [ ] Suspicious exposure detection
+* [ ] TLS inspection
+
+### System security
+
+* [ ] Operating system information
+* [ ] User and privilege analysis
+* [ ] Firewall configuration
+* [ ] Security configuration checks
+* [ ] Running process analysis
+* [ ] System update status
+
+### Docker security
+
+* [ ] Container discovery
+* [ ] Image information
+* [ ] Exposed container ports
+* [ ] Privileged containers
+* [ ] Host networking checks
+* [ ] Docker socket exposure
+* [ ] Container configuration analysis
+
+### Vulnerability intelligence
+
+* [ ] CVE enrichment
+* [ ] CVSS information
+* [ ] CISA KEV integration
+* [ ] EPSS integration
+* [ ] Software version matching
+
+### Dashboard
+
+* [ ] Finding details
+* [ ] Finding filters
+* [ ] Scan history
+* [ ] Security posture overview
+* [ ] Network overview
+* [ ] System overview
+* [ ] Docker overview
+* [ ] Vulnerability overview
+* [ ] Export functionality
+
+## Development
+
+AttackLens follows a modular architecture so that new security checks can be added without rewriting the entire application.
+
+The long-term goal is to separate:
+
+```text
+Collectors
+    ↓
+Raw observations
+    ↓
+Security checks
+    ↓
+Findings
+    ↓
+Results
+    ↓
+API
+    ↓
+Dashboard
+```
+
+This architecture should allow AttackLens to progressively evolve from a simple local scanner into a broader self-hosted security assessment platform.
 
 ## License
 
-AttackLens is released under the MIT License.
+See the repository for licensing information.
