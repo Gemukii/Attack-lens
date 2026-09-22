@@ -1,0 +1,44 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*.so
+
+# Virtual environments
+
+.venv/
+venv/
+env/
+
+# Packaging
+
+build/
+dist/
+*.egg-info/
+
+# Testing
+
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+
+.ruff_cache/
+
+# IDE
+
+.vscode/
+.idea/
+
+# OS
+
+.DS_Store
+Thumbs.db
+
+# Local AttackLens data
+
+data/
+*.db
+*.sqlite
+*.sqlite3
