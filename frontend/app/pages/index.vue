@@ -17,10 +17,14 @@ interface ScanResults {
 
 const config = useRuntimeConfig()
 
+const apiBase = (import.meta.server
+  ? config.apiInternalBase
+  : config.public.apiBase) as string | undefined
+
 const { data, error } = await useFetch<ScanResults>(
   '/api/results',
   {
-    baseURL: config.public.apiBase,
+    baseURL: apiBase,
   },
 )
 
