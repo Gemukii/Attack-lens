@@ -1,6 +1,6 @@
 # Python
 
-**pycache**/
+__pycache__/
 *.py[cod]
 *.so
 
@@ -30,6 +30,7 @@ htmlcov/
 
 .vscode/
 .idea/
+.fleet/
 
 # OS
 
@@ -42,3 +43,26 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+
+# Nuxt
+
+frontend/.nuxt/
+frontend/.output/
+frontend/.nitro/
+frontend/.cache/
+frontend/dist/
+
+# Node
+
+frontend/node_modules/
+
+# Logs
+
+logs/
+*.log
+
+# Local environment files
+
+.env
+.env.*
+!.env.example

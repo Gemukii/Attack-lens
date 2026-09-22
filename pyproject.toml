@@ -16,6 +16,8 @@ authors = [
 
 dependencies = [
 "psutil>=7.0,<8.0",
+    "fastapi",
+    "uvicorn",
 ]
 
 [project.optional-dependencies]
