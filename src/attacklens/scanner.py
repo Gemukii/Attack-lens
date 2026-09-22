@@ -49,6 +49,9 @@ def scan_network(host: str = "127.0.0.1") -> list[Finding]:
                         "Verify that this service is required and "
                         "properly secured."
                     ),
+                    port=port,
+                    service=service,
+                    protocol="tcp",
                 )
             )
 

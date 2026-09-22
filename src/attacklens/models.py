@@ -15,6 +15,11 @@ class Finding:
     evidence: str = ""
     remediation: str = ""
     references: list[str] = field(default_factory=list)
+    port: int | None = None
+    service: str | None = None
+    protocol: str | None = None
+    cve: str | None = None
+    cvss: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the finding to a JSON-serializable dictionary."""
