@@ -1,421 +1,523 @@
+```vue
 <script setup lang="ts">
-interface Finding {
-  category: string
-  severity: string
-  title: string
-  description: string
-  evidence: string
-  remediation: string
-  references: string[]
-}
+import type { Finding } from '~/types/scan'
+import { useScan } from '~/composables/useScan'
 
-interface ScanResults {
-  target: string
-  scan_type: string
-  findings: Finding[]
-}
-
+const { results: scan, status, error, loadResults, runScan } = useScan()
 const config = useRuntimeConfig()
+const target = ref(String(config.public.scanTarget || 'host.docker.internal'))
+const showAllFindings = ref(false)
+const selectedFinding = ref<Finding | null>(null)
 
-const apiBase = (import.meta.server
-  ? config.apiInternalBase
-  : config.public.apiBase) as string | undefined
+onMounted(loadResults)
 
-const { data, error } = await useFetch<ScanResults>(
-  '/api/results',
-  {
-    baseURL: apiBase,
-  },
+const findings = computed<Finding[]>(() => scan.value?.findings ?? [])
+
+const criticalCount = computed(() =>
+  findings.value.filter(
+    (finding) => finding.severity?.toLowerCase() === 'critical',
+  ).length,
 )
 
-const findings = computed(() => data.value?.findings ?? [])
+const highCount = computed(() =>
+  findings.value.filter(
+    (finding) => finding.severity?.toLowerCase() === 'high',
+  ).length,
+)
 
-function severityCount(severity: string): number {
-  return findings.value.filter(
-    (finding) => finding.severity === severity,
-  ).length
+const mediumCount = computed(() =>
+  findings.value.filter(
+    (finding) => finding.severity?.toLowerCase() === 'medium',
+  ).length,
+)
+
+const lowCount = computed(() =>
+  findings.value.filter(
+    (finding) => finding.severity?.toLowerCase() === 'low',
+  ).length,
+)
+
+const openPorts = computed(() => {
+  return scan.value?.open_ports?.length ?? 0
+})
+
+const score = computed(() => {
+  return scan.value?.score ?? 0
+})
+
+const scoreLabel = computed(() => {
+  if (!scan.value) return 'No scan yet'
+  if (score.value >= 80) return 'Good'
+  if (score.value >= 60) return 'Warning'
+  return 'At risk'
+})
+
+const scoreClass = computed(() => {
+  if (score.value >= 80) return 'good'
+  if (score.value >= 60) return 'warning'
+  return 'danger'
+})
+
+const scoreRingStyle = computed(() => ({
+  '--score-angle': `${score.value * 3.6}deg`,
+}))
+
+const topFindings = computed(() => {
+  const severityOrder: Record<string, number> = {
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+  }
+
+  return [...findings.value]
+    .sort(
+      (a, b) =>
+        (severityOrder[a.severity?.toLowerCase() ?? 'low'] ?? 4) -
+        (severityOrder[b.severity?.toLowerCase() ?? 'low'] ?? 4),
+    )
+    .slice(0, showAllFindings.value ? undefined : 5)
+})
+
+const lastScan = computed(() => scan.value?.completed_at ?? null)
+
+const formattedDate = computed(() => {
+  if (!lastScan.value) {
+    return 'No scan completed'
+  }
+
+  const date = new Date(lastScan.value)
+
+  if (Number.isNaN(date.getTime())) {
+    return String(lastScan.value)
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+})
+
+const formattedDuration = computed(() => {
+  if (scan.value?.duration_seconds === undefined) {
+    return '—'
+  }
+
+  return `${scan.value.duration_seconds.toFixed(1)}s`
+})
+
+const scanStatusLabel = computed(() => ({
+  idle: 'Ready',
+  loading: 'Loading results',
+  running: 'Scanning...',
+  completed: 'Completed',
+  failed: 'Failed',
+}[status.value]))
+
+const startScan = async () => {
+  await runScan(target.value.trim() || String(config.public.scanTarget || 'host.docker.internal'))
 }
+
+const refreshScan = () => loadResults()
 </script>
 
 <template>
-  <div class="dashboard">
-    <aside class="sidebar">
+  <main class="dashboard">
+    <header class="topbar">
       <div class="brand">
-        <div class="brand-mark">A</div>
+        <div class="brand-mark">
+          <span />
+          <span />
+          <span />
+        </div>
 
         <div>
-          <strong>AttackLens</strong>
-          <span>Security Scanner</span>
+          <h1>AttackLens</h1>
+          <p>Security overview</p>
         </div>
       </div>
 
-      <nav>
-        <a class="active">Overview</a>
-        <a>Findings</a>
-        <a>Scans</a>
-        <a>Network</a>
-        <a>System</a>
-        <a>Docker</a>
-      </nav>
-
-      <div class="sidebar-footer">
-        <span class="status-dot"></span>
-        Scanner online
-      </div>
-    </aside>
-
-    <main class="content">
-      <header class="header">
-        <div>
-          <p class="eyebrow">SECURITY OVERVIEW</p>
-          <h1>Dashboard</h1>
+      <div class="topbar-actions">
+        <div class="scan-status">
+          <span :class="['status-dot', { running: status === 'running' } ]" />
+          <span>{{ scanStatusLabel }}</span>
         </div>
 
-        <div class="target">
-          <span>Target</span>
-          <strong>{{ data?.target ?? 'Unknown' }}</strong>
-        </div>
-      </header>
+        <button class="refresh-button" type="button" @click="refreshScan">
+          <span>↻</span>
+          Refresh
+        </button>
 
-      <div v-if="error" class="error">
-        Unable to load scan results.
+        <button
+          class="run-button"
+          type="button"
+          :disabled="status === 'running'"
+          @click="startScan"
+        >
+          {{ status === 'running' ? 'Scanning...' : 'Run scan' }}
+        </button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="eyebrow">SECURITY OVERVIEW</p>
+        <h2>Your security at a glance.</h2>
+        <p class="hero-description">
+          Monitor vulnerabilities, exposed services and the overall security
+          posture of your target.
+        </p>
       </div>
 
-      <template v-else>
-        <section class="cards">
-          <article class="card">
-            <span>Total findings</span>
-            <strong>{{ findings.length }}</strong>
-          </article>
+      <div class="target-card">
+        <span class="target-label">TARGET</span>
+        <input v-model="target" aria-label="Scan target" :disabled="status === 'running'" />
+        <small v-if="scan">Last scan: {{ scan.target }}</small>
+      </div>
+    </section>
 
-          <article class="card critical">
-            <span>Critical</span>
-            <strong>{{ severityCount('critical') }}</strong>
-          </article>
+    <div v-if="error" class="error-banner">
+      <div>
+        <strong>Unable to load scan results</strong>
+        <span>
+          {{ error }}
+        </span>
+      </div>
 
-          <article class="card high">
-            <span>High</span>
-            <strong>{{ severityCount('high') }}</strong>
-          </article>
+      <button type="button" @click="refreshScan">
+        Retry
+      </button>
+    </div>
 
-          <article class="card medium">
-            <span>Medium</span>
-            <strong>{{ severityCount('medium') }}</strong>
-          </article>
-        </section>
+    <div v-if="status === 'loading'" class="loading-banner">
+      Loading the latest scan results...
+    </div>
 
-        <section class="panel">
-          <div class="panel-header">
+    <section class="overview-grid">
+      <article class="score-card">
+        <div class="card-heading">
+          <div>
+            <span class="card-label">SECURITY SCORE</span>
+            <h3>Overall posture</h3>
+          </div>
+
+          <span :class="['score-status', scoreClass]">
+            {{ scoreLabel }}
+          </span>
+        </div>
+
+        <div class="score-content">
+          <div class="score-ring" :class="scoreClass" :style="scoreRingStyle">
             <div>
-              <p class="eyebrow">LATEST SCAN</p>
-              <h2>Findings</h2>
+              <strong>{{ score }}</strong>
+              <span>/ 100</span>
+            </div>
+          </div>
+
+          <div class="score-info">
+            <p>
+              Based on the vulnerabilities and network exposure detected during
+              the latest scan.
+            </p>
+
+            <div class="score-bar">
+              <span
+                :style="{ width: `${score}%` }"
+              />
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <StatCard
+        label="Critical"
+        title="Immediate action"
+        :value="criticalCount"
+        variant="critical"
+        description="Critical findings"
+      />
+
+      <StatCard
+        label="High"
+        title="High priority"
+        :value="highCount"
+        variant="high"
+        description="High severity findings"
+      />
+
+      <StatCard
+        label="Open ports"
+        title="Network exposure"
+        :value="openPorts"
+        variant="neutral"
+        description="Detected open ports"
+      />
+    </section>
+
+    <section class="content-grid">
+      <article class="panel findings-panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">PRIORITY</span>
+            <h3>Security findings</h3>
+          </div>
+
+          <span class="count-badge">
+            {{ findings.length }} total
+          </span>
+        </div>
+
+        <div v-if="topFindings.length" class="findings-list">
+          <FindingCard
+            v-for="(finding, index) in topFindings"
+            :key="finding.id ?? finding.cve ?? index"
+            :finding="finding"
+            @view="selectedFinding = $event"
+          />
+        </div>
+
+        <button
+          v-if="findings.length > 5"
+          class="show-all-button"
+          type="button"
+          @click="showAllFindings = !showAllFindings"
+        >
+          {{ showAllFindings ? 'Show priority findings' : 'View all findings' }}
+        </button>
+
+        <div v-else-if="!scan" class="empty-state">
+          <div class="empty-icon">—</div>
+          <strong>No scan available</strong>
+          <p>Run a scan to build the first security overview.</p>
+        </div>
+
+        <div v-else class="empty-state">
+          <div class="empty-icon">✓</div>
+          <strong>No findings detected</strong>
+          <p>
+            AttackLens did not report any vulnerabilities for this scan.
+          </p>
+        </div>
+      </article>
+
+      <article class="panel distribution-panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">BREAKDOWN</span>
+            <h3>Severity distribution</h3>
+          </div>
+        </div>
+
+        <div class="severity-list">
+          <div class="severity-row">
+            <div class="severity-name">
+              <span class="severity-dot critical" />
+              <span>Critical</span>
             </div>
 
-            <span class="scan-type">
-              {{ data?.scan_type ?? 'unknown' }}
+            <strong>{{ criticalCount }}</strong>
+          </div>
+
+          <div class="severity-track">
+            <span
+              class="critical"
+              :style="{
+                width: `${findings.length ? (criticalCount / findings.length) * 100 : 0}%`,
+              }"
+            />
+          </div>
+
+          <div class="severity-row">
+            <div class="severity-name">
+              <span class="severity-dot high" />
+              <span>High</span>
+            </div>
+
+            <strong>{{ highCount }}</strong>
+          </div>
+
+          <div class="severity-track">
+            <span
+              class="high"
+              :style="{
+                width: `${findings.length ? (highCount / findings.length) * 100 : 0}%`,
+              }"
+            />
+          </div>
+
+          <div class="severity-row">
+            <div class="severity-name">
+              <span class="severity-dot medium" />
+              <span>Medium</span>
+            </div>
+
+            <strong>{{ mediumCount }}</strong>
+          </div>
+
+          <div class="severity-track">
+            <span
+              class="medium"
+              :style="{
+                width: `${findings.length ? (mediumCount / findings.length) * 100 : 0}%`,
+              }"
+            />
+          </div>
+
+          <div class="severity-row">
+            <div class="severity-name">
+              <span class="severity-dot low" />
+              <span>Low</span>
+            </div>
+
+            <strong>{{ lowCount }}</strong>
+          </div>
+
+          <div class="severity-track">
+            <span
+              class="low"
+              :style="{
+                width: `${findings.length ? (lowCount / findings.length) * 100 : 0}%`,
+              }"
+            />
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="bottom-grid">
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">NETWORK</span>
+            <h3>Exposure overview</h3>
+          </div>
+        </div>
+
+        <div class="network-stat">
+          <div class="network-number">
+            {{ openPorts }}
+          </div>
+
+          <div>
+            <strong>Open ports detected</strong>
+            <p>
+              Review exposed services and make sure only required services are
+              reachable.
+            </p>
+          </div>
+        </div>
+
+        <div class="network-footer">
+          <span>Network surface</span>
+          <strong>
+            {{ openPorts ? `${openPorts} exposed service${openPorts === 1 ? '' : 's'}` : 'No open ports detected' }}
+          </strong>
+        </div>
+
+        <ul v-if="scan?.services?.length" class="service-list">
+          <li v-for="service in scan.services" :key="`${service.name}-${service.port}`">
+            <span>{{ service.name }}</span>
+            <span>{{ service.protocol?.toUpperCase() ?? 'TCP' }} / {{ service.port }}</span>
+          </li>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">SCAN</span>
+            <h3>Latest scan</h3>
+          </div>
+        </div>
+
+        <dl class="scan-details">
+          <div>
+            <dt>Target</dt>
+            <dd>{{ scan?.target ?? '—' }}</dd>
+          </div>
+
+          <div>
+            <dt>Completed</dt>
+            <dd>{{ formattedDate }}</dd>
+          </div>
+
+          <div>
+            <dt>Duration</dt>
+            <dd>{{ formattedDuration }}</dd>
+          </div>
+
+          <div>
+            <dt>Findings</dt>
+            <dd>{{ findings.length }}</dd>
+          </div>
+        </dl>
+      </article>
+    </section>
+
+    <div
+      v-if="selectedFinding"
+      class="modal-backdrop"
+      role="presentation"
+      @click.self="selectedFinding = null"
+    >
+      <article
+        class="finding-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="finding-modal-title"
+      >
+        <div class="modal-header">
+          <div>
+            <span :class="['severity-badge', selectedFinding.severity?.toLowerCase() ?? 'unknown']">
+              {{ selectedFinding.severity ?? 'Unknown' }}
             </span>
+            <h3 id="finding-modal-title">
+              {{ selectedFinding.title ?? 'Security finding' }}
+            </h3>
           </div>
+          <button class="modal-close" type="button" aria-label="Close details" @click="selectedFinding = null">
+            ×
+          </button>
+        </div>
 
-          <div
-            v-if="findings.length === 0"
-            class="empty"
-          >
-            No findings detected.
+        <p class="modal-description">
+          {{ selectedFinding.description ?? 'No description provided.' }}
+        </p>
+
+        <dl class="finding-details">
+          <div v-if="selectedFinding.cve">
+            <dt>CVE</dt>
+            <dd>{{ selectedFinding.cve }}</dd>
           </div>
-
-          <div v-else class="findings">
-            <article
-              v-for="finding in findings"
-              :key="`${finding.title}-${finding.evidence}`"
-              class="finding"
-            >
-              <div
-                class="severity"
-                :class="finding.severity"
-              >
-                {{ finding.severity }}
-              </div>
-
-              <div class="finding-content">
-                <h3>{{ finding.title }}</h3>
-                <p>{{ finding.description }}</p>
-                <code>{{ finding.evidence }}</code>
-              </div>
-            </article>
+          <div v-if="selectedFinding.cvss !== undefined">
+            <dt>CVSS</dt>
+            <dd>{{ selectedFinding.cvss }}</dd>
           </div>
-        </section>
-      </template>
-    </main>
-  </div>
+          <div v-if="selectedFinding.service">
+            <dt>Service</dt>
+            <dd>{{ selectedFinding.service }}</dd>
+          </div>
+          <div v-if="selectedFinding.port">
+            <dt>Port</dt>
+            <dd>{{ selectedFinding.port }}</dd>
+          </div>
+          <div v-if="selectedFinding.evidence">
+            <dt>Evidence</dt>
+            <dd>{{ selectedFinding.evidence }}</dd>
+          </div>
+        </dl>
+
+        <div v-if="selectedFinding.remediation" class="remediation">
+          <span class="card-label">RECOMMENDATION</span>
+          <p>{{ selectedFinding.remediation }}</p>
+        </div>
+      </article>
+    </div>
+
+    <footer>
+      <span>AttackLens</span>
+      <span>Network security scanner</span>
+    </footer>
+  </main>
 </template>
-
-<style scoped>
-.dashboard {
-  min-height: 100vh;
-  display: flex;
-  background: #f5f7f8;
-  color: #17211b;
-}
-
-.sidebar {
-  width: 240px;
-  min-height: 100vh;
-  padding: 28px 20px;
-  display: flex;
-  flex-direction: column;
-  background: #14231b;
-  color: #f4f7f5;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 48px;
-}
-
-.brand-mark {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: #dfe9df;
-  color: #14231b;
-  font-weight: 800;
-}
-
-.brand strong,
-.brand span {
-  display: block;
-}
-
-.brand span {
-  margin-top: 3px;
-  font-size: 11px;
-  opacity: 0.55;
-}
-
-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-nav a {
-  padding: 11px 12px;
-  border-radius: 8px;
-  color: #b9c5be;
-  font-size: 14px;
-}
-
-nav a.active {
-  background: #26392d;
-  color: white;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  font-size: 12px;
-  color: #9cab9f;
-}
-
-.status-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 7px;
-  border-radius: 50%;
-  background: #74b883;
-}
-
-.content {
-  flex: 1;
-  max-width: 1400px;
-  padding: 42px 48px;
-}
-
-.header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 32px;
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #718078;
-}
-
-h1 {
-  margin: 0;
-  font-size: 32px;
-}
-
-.target {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.target span {
-  font-size: 11px;
-  color: #78847d;
-}
-
-.target strong {
-  font-family: monospace;
-  font-size: 13px;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.card {
-  padding: 22px;
-  border: 1px solid #e1e6e3;
-  border-radius: 14px;
-  background: white;
-}
-
-.card span {
-  display: block;
-  margin-bottom: 12px;
-  color: #738078;
-  font-size: 13px;
-}
-
-.card strong {
-  font-size: 30px;
-}
-
-.card.critical {
-  border-left: 4px solid #8c4c4c;
-}
-
-.card.high {
-  border-left: 4px solid #b87852;
-}
-
-.card.medium {
-  border-left: 4px solid #b49a54;
-}
-
-.panel {
-  border: 1px solid #e1e6e3;
-  border-radius: 14px;
-  background: white;
-  overflow: hidden;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 24px;
-  border-bottom: 1px solid #e8ece9;
-}
-
-.panel-header h2 {
-  margin: 0;
-}
-
-.scan-type {
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: #edf2ee;
-  font-family: monospace;
-  font-size: 12px;
-}
-
-.finding {
-  display: flex;
-  gap: 18px;
-  padding: 20px 24px;
-  border-bottom: 1px solid #edf0ee;
-}
-
-.finding:last-child {
-  border-bottom: 0;
-}
-
-.severity {
-  width: 75px;
-  height: fit-content;
-  padding: 5px 8px;
-  border-radius: 5px;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.severity.info {
-  background: #e9eef0;
-  color: #536269;
-}
-
-.severity.medium {
-  background: #f1ead8;
-  color: #806d38;
-}
-
-.severity.high {
-  background: #f2e1d8;
-  color: #8d5337;
-}
-
-.severity.critical {
-  background: #ead8d8;
-  color: #7c3d3d;
-}
-
-.finding-content {
-  flex: 1;
-}
-
-.finding h3 {
-  margin: 0 0 6px;
-  font-size: 15px;
-}
-
-.finding p {
-  margin: 0 0 10px;
-  color: #69766f;
-  font-size: 13px;
-}
-
-code {
-  color: #53635a;
-  font-size: 12px;
-}
-
-.empty,
-.error {
-  padding: 40px;
-  text-align: center;
-  color: #718078;
-}
-
-@media (max-width: 900px) {
-  .sidebar {
-    width: 190px;
-  }
-
-  .content {
-    padding: 30px;
-  }
-
-  .cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-</style>
+```

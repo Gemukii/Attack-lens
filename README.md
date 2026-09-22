@@ -145,12 +145,23 @@ The FastAPI backend currently exposes:
 
 ```text
 GET /api/health
+POST /api/scan
 GET /api/results
 ```
 
 `/api/health` provides a basic API health check.
 
 `/api/results` returns the latest stored scan results.
+
+`POST /api/scan` is synchronous. It expects a JSON body such as
+`{"target":"127.0.0.1"}` and returns the same result document as
+`GET /api/results`. A successful response includes `findings`, `score`,
+`open_ports`, `services`, `completed_at`, and `duration_seconds`. It returns
+`404` from `/api/results` when no scan has been stored yet.
+
+When running with Docker, the default target is `host.docker.internal`, which
+refers to the host machine from inside the API container. Override it with
+`ATTACKLENS_DEFAULT_TARGET` when scanning another host.
 
 ### Dashboard
 

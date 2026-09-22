@@ -1,6 +1,8 @@
 """FastAPI backend for AttackLens."""
 
 import json
+import os
+from time import perf_counter
 from pathlib import Path
 from typing import Any
 
@@ -26,12 +28,13 @@ app.add_middleware(
 )
 
 RESULTS_PATH = Path("results/latest.json")
+DEFAULT_TARGET = os.getenv("ATTACKLENS_DEFAULT_TARGET", "127.0.0.1")
 
 
 class ScanRequest(BaseModel):
     """Request body for a network scan."""
 
-    target: str = "127.0.0.1"
+    target: str = DEFAULT_TARGET
 
 
 @app.get("/api/health")
@@ -42,7 +45,8 @@ def health() -> dict[str, str]:
 
 @app.post("/api/scan")
 def run_scan(request: ScanRequest) -> dict[str, Any]:
-    """Run a network scan and save the results."""
+    """Run a synchronous network scan and return its persisted result."""
+    started_at = perf_counter()
     findings = scan_network(request.target)
 
     save_results(
@@ -50,13 +54,10 @@ def run_scan(request: ScanRequest) -> dict[str, Any]:
         path=RESULTS_PATH,
         target=request.target,
         scan_type="network",
+        duration_seconds=perf_counter() - started_at,
     )
 
-    return {
-        "target": request.target,
-        "scan_type": "network",
-        "findings": [finding.to_dict() for finding in findings],
-    }
+    return get_results()
 
 
 @app.get("/api/results")
