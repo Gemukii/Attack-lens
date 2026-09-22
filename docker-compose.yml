@@ -17,6 +17,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NUXT_PUBLIC_API_BASE: http://localhost:8000
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE}
+      API_INTERNAL_BASE: ${API_INTERNAL_BASE}
     depends_on:
       - api
