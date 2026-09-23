@@ -76,7 +76,15 @@ const severityIcon = computed(() => {
         <span v-if="finding.port">
           Port {{ finding.port }}
         </span>
+
+        <span v-if="finding.version">
+          {{ finding.version }}
+        </span>
       </div>
+
+      <p v-if="finding.risk_reason" class="finding-reason">
+        {{ finding.risk_reason }}
+      </p>
     </div>
 
     <button

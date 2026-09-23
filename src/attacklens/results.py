@@ -14,6 +14,8 @@ def save_results(
     target: str,
     scan_type: str,
     duration_seconds: float | None = None,
+    scan_id: str | None = None,
+    history_path: Path | None = None,
 ) -> None:
     """Save scan findings to a JSON file."""
     data: dict[str, Any] = {
@@ -22,6 +24,9 @@ def save_results(
         "findings": [finding.to_dict() for finding in findings],
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    if scan_id is not None:
+        data["scan_id"] = scan_id
 
     if duration_seconds is not None:
         data["duration_seconds"] = round(duration_seconds, 3)
@@ -42,6 +47,8 @@ def save_results(
             "name": finding.service or finding.title,
             "port": finding.port,
             "protocol": finding.protocol,
+            "version": finding.version,
+            "banner": finding.banner,
         }
         for finding in findings
         if finding.category == "network"
@@ -51,3 +58,8 @@ def save_results(
 
     with path.open("w", encoding="utf-8") as file:
         json.dump(data, file, indent=2, ensure_ascii=False)
+
+    if history_path is not None:
+        history_path.parent.mkdir(parents=True, exist_ok=True)
+        with history_path.open("w", encoding="utf-8") as file:
+            json.dump(data, file, indent=2, ensure_ascii=False)

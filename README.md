@@ -147,6 +147,8 @@ The FastAPI backend currently exposes:
 GET /api/health
 POST /api/scan
 GET /api/results
+GET /api/scans
+GET /api/scans/compare?before_id=<id>&after_id=<id>
 ```
 
 `/api/health` provides a basic API health check.
@@ -158,6 +160,12 @@ GET /api/results
 `GET /api/results`. A successful response includes `findings`, `score`,
 `open_ports`, `services`, `completed_at`, and `duration_seconds`. It returns
 `404` from `/api/results` when no scan has been stored yet.
+
+Each completed scan is also stored in `results/history/<scan-id>.json` and is
+returned by `GET /api/scans`, newest first. History entries contain the score,
+findings, target, duration, detected services, and completion time.
+The comparison endpoint reports new, fixed, and persistent findings, plus
+score changes and ports added or removed between two scans.
 
 When running with Docker, the default target is `host.docker.internal`, which
 refers to the host machine from inside the API container. Override it with

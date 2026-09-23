@@ -27,6 +27,10 @@
   --radius: 14px;
   --radius-small: 9px;
 
+  --text-body: 15px;
+  --text-small: 13px;
+  --text-meta: 12px;
+
   font-family:
     Inter,
     ui-sans-serif,
@@ -57,6 +61,7 @@ body {
     ),
     var(--bg);
   color: var(--text);
+  font-size: var(--text-body);
 }
 
 button {
@@ -125,7 +130,7 @@ button:focus-visible {
 
 .brand h1 {
   margin: 0;
-  font-size: 17px;
+  font-size: 19px;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
@@ -133,7 +138,7 @@ button:focus-visible {
 .brand p {
   margin: 3px 0 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .topbar-actions {
@@ -147,7 +152,7 @@ button:focus-visible {
   align-items: center;
   gap: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .status-dot {
@@ -163,7 +168,8 @@ button:focus-visible {
   align-items: center;
   gap: 8px;
 
-  padding: 9px 13px;
+  padding: 11px 15px;
+  font-size: 14px;
 
   color: var(--text);
   background: var(--surface);
@@ -187,11 +193,12 @@ button:focus-visible {
 }
 
 .run-button {
-  padding: 9px 14px;
+  padding: 11px 17px;
   color: #07110d;
   background: var(--green);
   border: 1px solid var(--green);
   border-radius: 8px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -231,7 +238,7 @@ button:focus-visible {
 .target-label {
   display: block;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -250,13 +257,13 @@ button:focus-visible {
   margin: 0;
 
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.65;
 }
 
 .target-card {
-  min-width: 210px;
-  padding: 16px 18px;
+  min-width: 250px;
+  padding: 19px 21px;
 
   background: rgba(16, 22, 30, 0.8);
   border: 1px solid var(--border);
@@ -286,14 +293,14 @@ button:focus-visible {
   border-bottom: 1px solid var(--border-light);
   outline: none;
   font: inherit;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .target-card small {
   display: block;
   margin-top: 7px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 /* Error */
@@ -366,8 +373,8 @@ button:focus-visible {
 }
 
 .score-card {
-  min-height: 225px;
-  padding: 22px;
+  min-height: 250px;
+  padding: 26px;
 }
 
 .card-heading,
@@ -382,15 +389,15 @@ button:focus-visible {
 .card-heading h3,
 .panel-header h3 {
   margin: 7px 0 0;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .score-status {
-  padding: 5px 8px;
+  padding: 6px 10px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -413,7 +420,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 26px;
-  margin-top: 25px;
+  margin-top: 29px;
 }
 
 .score-ring {
@@ -421,8 +428,8 @@ button:focus-visible {
   flex-shrink: 0;
   place-items: center;
 
-  width: 108px;
-  height: 108px;
+  width: 124px;
+  height: 124px;
 
   border-radius: 50%;
   background:
@@ -448,14 +455,14 @@ button:focus-visible {
 }
 
 .score-ring strong {
-  font-size: 28px;
+  font-size: 34px;
   letter-spacing: -0.05em;
 }
 
 .score-ring span {
   margin-left: 2px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .score-info {
@@ -465,12 +472,12 @@ button:focus-visible {
 .score-info p {
   margin: 0 0 17px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
 .score-bar {
-  height: 5px;
+  height: 7px;
   overflow: hidden;
   background: #1b242d;
   border-radius: 99px;
@@ -483,11 +490,19 @@ button:focus-visible {
   border-radius: inherit;
 }
 
+.score-card.warning .score-bar span {
+  background: var(--orange);
+}
+
+.score-card.danger .score-bar span {
+  background: var(--red);
+}
+
 /* Stat cards */
 
 .stat-card {
-  min-height: 225px;
-  padding: 22px;
+  min-height: 250px;
+  padding: 26px;
 
   transition:
     transform 0.15s ease,
@@ -530,7 +545,7 @@ button:focus-visible {
 .stat-value {
   margin: 27px 0 20px;
 
-  font-size: 42px;
+  font-size: 52px;
   font-weight: 650;
   line-height: 1;
   letter-spacing: -0.055em;
@@ -542,13 +557,13 @@ button:focus-visible {
 }
 
 .stat-bottom strong {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .stat-bottom span {
   margin-top: 5px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 /* Main content */
@@ -561,25 +576,25 @@ button:focus-visible {
 }
 
 .panel {
-  padding: 22px;
+  padding: 26px;
 }
 
 .count-badge {
-  padding: 5px 8px;
+  padding: 6px 10px;
 
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   border-radius: 6px;
 
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .findings-list {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  margin-top: 20px;
+  gap: 11px;
+  margin-top: 24px;
 }
 
 .show-all-button {
@@ -590,7 +605,7 @@ button:focus-visible {
   border: 1px solid var(--border);
   border-radius: 7px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 /* Findings */
@@ -598,9 +613,9 @@ button:focus-visible {
 .finding-card {
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 16px;
 
-  padding: 14px;
+  padding: 17px;
 
   background: rgba(255, 255, 255, 0.018);
   border: 1px solid var(--border);
@@ -621,11 +636,11 @@ button:focus-visible {
   flex-shrink: 0;
   place-items: center;
 
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
 
   border-radius: 8px;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .finding-severity.critical {
@@ -668,11 +683,11 @@ button:focus-visible {
 }
 
 .severity-badge {
-  padding: 3px 6px;
+  padding: 4px 7px;
 
   border-radius: 4px;
 
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -702,7 +717,7 @@ button:focus-visible {
 
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -710,7 +725,7 @@ button:focus-visible {
 .cvss {
   flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .finding-card h4 {
@@ -718,7 +733,7 @@ button:focus-visible {
 
   overflow: hidden;
 
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -729,7 +744,14 @@ button:focus-visible {
   gap: 12px;
 
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
+}
+
+.finding-reason {
+  margin: 7px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .finding-action {
@@ -739,14 +761,14 @@ button:focus-visible {
 
   flex-shrink: 0;
 
-  padding: 6px 8px;
+  padding: 8px 10px;
 
   color: var(--text-secondary);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
 
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -784,7 +806,7 @@ button:focus-visible {
 
 .modal-header h3 {
   margin: 12px 0 0;
-  font-size: 18px;
+  font-size: 21px;
 }
 
 .modal-close {
@@ -802,8 +824,22 @@ button:focus-visible {
 .modal-description {
   margin: 24px 0 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
+}
+
+.risk-summary {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: var(--orange-soft);
+  border-left: 2px solid var(--orange);
+}
+
+.risk-summary p {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .finding-details {
@@ -823,7 +859,7 @@ button:focus-visible {
 .finding-details dd {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 
@@ -836,7 +872,7 @@ button:focus-visible {
 .remediation p {
   margin: 8px 0 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -853,7 +889,7 @@ button:focus-visible {
 
   margin-bottom: 8px;
 
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .severity-name {
@@ -865,7 +901,7 @@ button:focus-visible {
 
 .severity-row strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .severity-dot {
@@ -927,7 +963,7 @@ button:focus-visible {
 }
 
 .network-number {
-  font-size: 43px;
+  font-size: 52px;
   font-weight: 650;
   line-height: 1;
   letter-spacing: -0.055em;
@@ -935,7 +971,7 @@ button:focus-visible {
 
 .network-stat strong {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .network-stat p {
@@ -943,7 +979,7 @@ button:focus-visible {
   margin: 5px 0 0;
 
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -958,7 +994,7 @@ button:focus-visible {
   border-top: 1px solid var(--border);
 
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .network-footer strong {
@@ -980,13 +1016,13 @@ button:focus-visible {
   padding-top: 8px;
   border-top: 1px solid var(--border);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .service-list li span:last-child {
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .scan-details {
@@ -1004,7 +1040,7 @@ button:focus-visible {
   margin-bottom: 6px;
 
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .scan-details dd {
@@ -1013,10 +1049,118 @@ button:focus-visible {
   overflow: hidden;
 
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.history-panel {
+  grid-column: 1 / -1;
+}
+
+.history-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-row div:first-child,
+.history-score {
+  display: grid;
+  gap: 4px;
+}
+
+.history-row strong {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.history-row span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.history-score {
+  text-align: right;
+}
+
+.history-score strong {
+  color: var(--green);
+}
+
+.history-empty {
+  margin-top: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.comparison-panel {
+  grid-column: 1 / -1;
+}
+
+.comparison-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.comparison-controls select {
+  min-width: min(100%, 320px);
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--surface-hover);
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.comparison-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comparison-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.comparison-summary div {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.comparison-summary strong {
+  font-size: 24px;
+}
+
+.comparison-summary span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.comparison-summary p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 /* Empty state */
@@ -1048,14 +1192,14 @@ button:focus-visible {
 }
 
 .empty-state strong {
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .empty-state p {
   margin: 7px 0 0;
 
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 /* Footer */
@@ -1068,7 +1212,7 @@ footer {
   padding: 0 3px;
 
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 /* Responsive */
@@ -1094,7 +1238,14 @@ footer {
   }
 
   .topbar {
+    align-items: flex-start;
+    flex-direction: column;
     margin-bottom: 45px;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .scan-status {
@@ -1132,10 +1283,6 @@ footer {
 }
 
 @media (max-width: 500px) {
-  .topbar {
-    align-items: flex-start;
-  }
-
   .refresh-button {
     padding: 8px 10px;
   }
@@ -1150,6 +1297,26 @@ footer {
 
   .hero h2 {
     font-size: 32px;
+  }
+
+  .hero-description {
+    font-size: 15px;
+  }
+
+  .score-card,
+  .stat-card,
+  .panel {
+    padding: 20px;
+  }
+
+  .score-ring {
+    width: 112px;
+    height: 112px;
+  }
+
+  .stat-value,
+  .network-number {
+    font-size: 46px;
   }
 
   .score-content {
@@ -1176,6 +1343,19 @@ footer {
 
   .finding-details {
     grid-template-columns: 1fr;
+  }
+
+  .comparison-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .comparison-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .comparison-summary p {
+    grid-column: 1 / -1;
   }
 
   footer {

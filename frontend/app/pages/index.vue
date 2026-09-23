@@ -3,13 +3,14 @@
 import type { Finding } from '~/types/scan'
 import { useScan } from '~/composables/useScan'
 
-const { results: scan, status, error, loadResults, runScan } = useScan()
+const { results: scan, history, comparison, status, error, loadResults, loadHistory, compareScans, runScan } = useScan()
 const config = useRuntimeConfig()
 const target = ref(String(config.public.scanTarget || 'host.docker.internal'))
 const showAllFindings = ref(false)
 const selectedFinding = ref<Finding | null>(null)
+const comparisonTarget = ref('')
 
-onMounted(loadResults)
+onMounted(() => Promise.all([loadResults(), loadHistory()]))
 
 const findings = computed<Finding[]>(() => scan.value?.findings ?? [])
 
@@ -105,7 +106,13 @@ const formattedDuration = computed(() => {
 
   return `${scan.value.duration_seconds.toFixed(1)}s`
 })
+const refreshScan = () => Promise.all([loadResults(), loadHistory()])
 
+const compareWithSelectedScan = () => {
+  if (comparisonTarget.value && scan.value?.scan_id) {
+    return compareScans(comparisonTarget.value, scan.value.scan_id)
+  }
+}
 const scanStatusLabel = computed(() => ({
   idle: 'Ready',
   loading: 'Loading results',
@@ -118,7 +125,6 @@ const startScan = async () => {
   await runScan(target.value.trim() || String(config.public.scanTarget || 'host.docker.internal'))
 }
 
-const refreshScan = () => loadResults()
 </script>
 
 <template>
@@ -194,7 +200,7 @@ const refreshScan = () => loadResults()
     </div>
 
     <section class="overview-grid">
-      <article class="score-card">
+      <article :class="['score-card', scoreClass]">
         <div class="card-heading">
           <div>
             <span class="card-label">SECURITY SCORE</span>
@@ -452,6 +458,43 @@ const refreshScan = () => loadResults()
           </div>
         </dl>
       </article>
+
+      <article class="panel comparison-panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">CHANGE ANALYSIS</span>
+            <h3>Compare with a previous scan</h3>
+          </div>
+        </div>
+
+        <div v-if="scan?.scan_id && history.length > 1" class="comparison-controls">
+          <select v-model="comparisonTarget" aria-label="Previous scan to compare">
+            <option disabled value="">Select a previous scan</option>
+            <option
+              v-for="item in history.filter((entry) => entry.scan_id !== scan?.scan_id)"
+              :key="item.scan_id"
+              :value="item.scan_id"
+            >
+              {{ item.completed_at ? new Date(item.completed_at).toLocaleString() : item.scan_id }}
+            </option>
+          </select>
+          <button class="show-all-button" type="button" :disabled="!comparisonTarget" @click="compareWithSelectedScan">
+            Compare
+          </button>
+        </div>
+
+        <div v-if="comparison" class="comparison-summary">
+          <div><strong>{{ comparison.score_delta > 0 ? '+' : '' }}{{ comparison.score_delta }}</strong><span>score change</span></div>
+          <div><strong>{{ comparison.new_findings.length }}</strong><span>new findings</span></div>
+          <div><strong>{{ comparison.fixed_findings.length }}</strong><span>fixed findings</span></div>
+          <div><strong>{{ comparison.persistent_findings.length }}</strong><span>still present</span></div>
+          <p>Ports added: {{ comparison.ports_added.length ? comparison.ports_added.join(', ') : 'none' }}. Ports removed: {{ comparison.ports_removed.length ? comparison.ports_removed.join(', ') : 'none' }}.</p>
+        </div>
+
+        <div v-else class="history-empty">
+          Run at least two scans to compare changes over time.
+        </div>
+      </article>
     </section>
 
     <div
@@ -484,6 +527,11 @@ const refreshScan = () => loadResults()
           {{ selectedFinding.description ?? 'No description provided.' }}
         </p>
 
+        <div v-if="selectedFinding.risk_reason" class="risk-summary">
+          <span class="card-label">WHY IT MATTERS</span>
+          <p>{{ selectedFinding.risk_reason }}</p>
+        </div>
+
         <dl class="finding-details">
           <div v-if="selectedFinding.cve">
             <dt>CVE</dt>
@@ -501,9 +549,17 @@ const refreshScan = () => loadResults()
             <dt>Port</dt>
             <dd>{{ selectedFinding.port }}</dd>
           </div>
+          <div v-if="selectedFinding.version">
+            <dt>Version</dt>
+            <dd>{{ selectedFinding.version }}</dd>
+          </div>
           <div v-if="selectedFinding.evidence">
             <dt>Evidence</dt>
             <dd>{{ selectedFinding.evidence }}</dd>
+          </div>
+          <div v-if="selectedFinding.banner">
+            <dt>Banner</dt>
+            <dd>{{ selectedFinding.banner }}</dd>
           </div>
         </dl>
 
