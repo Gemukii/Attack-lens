@@ -2,17 +2,21 @@
 
 import json
 import os
+import re
 from uuid import uuid4
 from time import perf_counter
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from fastapi.middleware.cors import CORSMiddleware
 
 from attacklens.results import save_results
+from attacklens.inventory import collect_inventory
+from attacklens.posture import collect_posture
 from attacklens.scanner import scan_network
+from attacklens.vulnerabilities import query_package_vulnerabilities
 
 app = FastAPI(
     title="AttackLens API",
@@ -31,12 +35,24 @@ app.add_middleware(
 RESULTS_PATH = Path("results/latest.json")
 HISTORY_PATH = Path("results/history")
 DEFAULT_TARGET = os.getenv("ATTACKLENS_DEFAULT_TARGET", "127.0.0.1")
+INVENTORY_SCOPE = os.getenv("ATTACKLENS_INVENTORY_SCOPE", "runtime")
 
 
 class ScanRequest(BaseModel):
     """Request body for a network scan."""
 
-    target: str = DEFAULT_TARGET
+    target: str = Field(default=DEFAULT_TARGET, min_length=1, max_length=253)
+
+    @field_validator("target")
+    @classmethod
+    def validate_target(cls, value: str) -> str:
+        """Reject URLs and shell-like input; targets remain hostnames or IPs."""
+        target = value.strip()
+        if not target or any(character in target for character in "/\\\x00\n\r\t"):
+            raise ValueError("target must be a hostname or IP address")
+        if not re.fullmatch(r"[A-Za-z0-9._:-]+", target):
+            raise ValueError("target contains unsupported characters")
+        return target
 
 
 def _load_scan(scan_id: str) -> dict[str, Any]:
@@ -66,22 +82,53 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/inventory")
+def get_inventory() -> dict[str, Any]:
+    """Return safe metadata for the environment running the API."""
+    return collect_inventory(INVENTORY_SCOPE)
+
+
+@app.get("/api/vulnerabilities")
+def get_vulnerabilities() -> dict[str, Any]:
+    """Check runtime packages against OSV without affecting network scans."""
+    inventory = collect_inventory(INVENTORY_SCOPE)
+    return query_package_vulnerabilities(inventory["packages"])
+
+
+@app.get("/api/posture")
+def get_posture() -> dict[str, Any]:
+    """Return non-invasive security posture checks for the API runtime."""
+    return collect_posture(INVENTORY_SCOPE)
+
+
 @app.post("/api/scan")
 def run_scan(request: ScanRequest) -> dict[str, Any]:
     """Run a synchronous network scan and return its persisted result."""
     started_at = perf_counter()
     scan_id = str(uuid4())
-    findings = scan_network(request.target)
+    try:
+        findings = scan_network(request.target)
+    except (OSError, TimeoutError) as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Unable to scan target '{request.target}': {error}",
+        ) from error
 
-    save_results(
-        findings=findings,
-        path=RESULTS_PATH,
-        target=request.target,
-        scan_type="network",
-        duration_seconds=perf_counter() - started_at,
-        scan_id=scan_id,
-        history_path=HISTORY_PATH / f"{scan_id}.json",
-    )
+    try:
+        save_results(
+            findings=findings,
+            path=RESULTS_PATH,
+            target=request.target,
+            scan_type="network",
+            duration_seconds=perf_counter() - started_at,
+            scan_id=scan_id,
+            history_path=HISTORY_PATH / f"{scan_id}.json",
+        )
+    except OSError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to save scan results: {error}",
+        ) from error
 
     return get_results()
 

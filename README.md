@@ -149,6 +149,9 @@ POST /api/scan
 GET /api/results
 GET /api/scans
 GET /api/scans/compare?before_id=<id>&after_id=<id>
+GET /api/inventory
+GET /api/vulnerabilities
+GET /api/posture
 ```
 
 `/api/health` provides a basic API health check.
@@ -167,9 +170,42 @@ findings, target, duration, detected services, and completion time.
 The comparison endpoint reports new, fixed, and persistent findings, plus
 score changes and ports added or removed between two scans.
 
+`GET /api/inventory` returns safe metadata from the environment running the
+API: operating system, hostname, user, CPU, memory, disks, network addresses,
+and a bounded process list, plus installed Python packages and versions. In
+Docker, its scope is explicitly `container`; it does not claim to be a full
+inventory of the host machine or its Windows-installed software.
+
+`GET /api/vulnerabilities` checks the visible Python packages against the OSV
+public vulnerability database. It is independent from the network scan and
+returns `status: unavailable` when the external advisory service cannot be
+reached.
+
+`GET /api/posture` runs non-invasive configuration checks for the API runtime,
+including root privileges, Docker socket exposure, sensitive environment
+variable names, and host firewall visibility.
+
 When running with Docker, the default target is `host.docker.internal`, which
 refers to the host machine from inside the API container. Override it with
 `ATTACKLENS_DEFAULT_TARGET` when scanning another host.
+
+The package inventory shown by the dashboard belongs to the API runtime. When
+using Docker, rebuild the API image after changing Python packages:
+
+```powershell
+docker compose build --no-cache api
+docker compose up -d api
+```
+
+The API container runs as the unprivileged `attacklens` user, and the dashboard
+runs as the unprivileged Node `node` user. Both use `no-new-privileges`.
+Scan results are stored in the persistent Docker volume `attacklens-results`,
+which avoids host bind-mount permission issues while preserving data across
+container recreation.
+
+The Compose setup also drops all Linux capabilities, uses a read-only API
+filesystem, limits CPU/memory/processes, binds local ports to `127.0.0.1`, and
+waits for the API healthcheck before starting the dashboard.
 
 ### Dashboard
 
