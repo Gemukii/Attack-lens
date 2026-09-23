@@ -57,3 +57,88 @@ export interface ScanComparison {
   ports_added: number[]
   ports_removed: number[]
 }
+
+export interface HostInventory {
+  collected_at: string
+  scope: string
+  hostname: string
+  current_user: string
+  os: {
+    system: string
+    release: string
+    version: string
+    machine: string
+    python: string
+  }
+  cpu: {
+    logical_count?: number
+    physical_count?: number
+    percent_used: number
+  }
+  memory: {
+    total_bytes: number
+    available_bytes: number
+    percent_used: number
+  }
+  disks: Array<{
+    device: string
+    mountpoint: string
+    filesystem: string
+    total_bytes: number
+    used_bytes: number
+    free_bytes: number
+    percent_used: number
+  }>
+  network_addresses: Array<{
+    interface: string
+    family: string
+    address: string
+  }>
+  processes: Array<{
+    pid: number
+    name: string
+    username?: string
+    status?: string
+  }>
+  packages: Array<{
+    name: string
+    version: string
+  }>
+  python_path: string
+}
+
+export interface VulnerabilityReport {
+  status: 'complete' | 'unavailable'
+  packages_checked: number
+  vulnerabilities: Array<{
+    id?: string
+    aliases: string[]
+    summary: string
+    details: string
+    modified?: string
+    package: string
+    version: string
+    fixed_versions: string[]
+    references: string[]
+    severity?: string
+    remediation: string
+  }>
+}
+
+export interface PostureReport {
+  scope: string
+  checks: Array<{
+    id: string
+    title: string
+    status: 'pass' | 'fail' | 'warn' | 'unknown' | 'not_checked'
+    severity: string
+    description: string
+    remediation: string
+    evidence?: string[]
+  }>
+  summary: {
+    failures: number
+    warnings: number
+    unknown: number
+  }
+}

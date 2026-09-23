@@ -12,6 +12,13 @@ from attacklens.web import api
 client = TestClient(api.app)
 
 
+def test_scan_rejects_url_like_targets() -> None:
+    """The scan endpoint should accept hosts, not arbitrary URLs or paths."""
+    response = client.post("/api/scan", json={"target": "http://example.test"})
+
+    assert response.status_code == 422
+
+
 def test_get_results_returns_404_when_no_scan_exists(tmp_path, monkeypatch) -> None:
     """The dashboard should be able to distinguish no scan from an empty scan."""
     monkeypatch.setattr(api, "RESULTS_PATH", tmp_path / "missing.json")

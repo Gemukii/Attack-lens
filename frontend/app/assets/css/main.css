@@ -1108,6 +1108,220 @@ button:focus-visible {
   grid-column: 1 / -1;
 }
 
+.inventory-panel {
+  grid-column: 1 / -1;
+}
+
+.vulnerability-panel {
+  grid-column: 1 / -1;
+}
+
+.posture-panel {
+  grid-column: 1 / -1;
+}
+
+.posture-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.posture-row {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.posture-status {
+  width: fit-content;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.posture-status.pass {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.posture-status.fail {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.posture-status.warn {
+  color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.posture-status.unknown,
+.posture-status.not_checked {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.posture-row strong {
+  font-size: 14px;
+}
+
+.posture-row p,
+.posture-row small {
+  display: block;
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.posture-row small {
+  color: var(--orange);
+  font-size: 12px;
+}
+
+.risk-count {
+  color: var(--red);
+  border-color: rgba(255, 92, 92, 0.35);
+  background: var(--red-soft);
+}
+
+.vulnerability-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.vulnerability-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.35fr) 1fr;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.vulnerability-row div {
+  display: grid;
+  gap: 5px;
+}
+
+.vulnerability-row strong {
+  color: var(--red);
+  font-size: 13px;
+}
+
+.vulnerability-cvss {
+  color: var(--orange) !important;
+  font-size: 12px !important;
+  font-weight: 700;
+}
+
+.vulnerability-row span,
+.vulnerability-row p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.vulnerability-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.vulnerability-detail a {
+  width: fit-content;
+  color: var(--blue);
+  font-size: 12px;
+}
+
+.vulnerability-fix {
+  color: var(--orange);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.patched-version {
+  color: var(--green) !important;
+  font-size: 12px !important;
+}
+
+.compact-empty {
+  min-height: 130px;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px 24px;
+  margin: 24px 0 0;
+}
+
+.inventory-grid div {
+  min-width: 0;
+}
+
+.inventory-grid dt {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.inventory-grid dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.package-list {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.package-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.package-list-header > span:last-child {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.package-list ul {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.package-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.package-list code {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .comparison-controls {
   display: flex;
   align-items: center;
@@ -1356,6 +1570,19 @@ footer {
 
   .comparison-summary p {
     grid-column: 1 / -1;
+  }
+
+  .inventory-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .package-list ul {
+    grid-template-columns: 1fr;
+  }
+
+  .vulnerability-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   footer {

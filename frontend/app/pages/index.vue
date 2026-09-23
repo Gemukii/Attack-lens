@@ -3,14 +3,14 @@
 import type { Finding } from '~/types/scan'
 import { useScan } from '~/composables/useScan'
 
-const { results: scan, history, comparison, status, error, loadResults, loadHistory, compareScans, runScan } = useScan()
+const { results: scan, history, comparison, inventory, vulnerabilities, posture, status, error, loadResults, loadHistory, loadInventory, loadVulnerabilities, loadPosture, compareScans, runScan } = useScan()
 const config = useRuntimeConfig()
 const target = ref(String(config.public.scanTarget || 'host.docker.internal'))
 const showAllFindings = ref(false)
 const selectedFinding = ref<Finding | null>(null)
 const comparisonTarget = ref('')
 
-onMounted(() => Promise.all([loadResults(), loadHistory()]))
+onMounted(() => Promise.all([loadResults(), loadHistory(), loadInventory(), loadVulnerabilities(), loadPosture()]))
 
 const findings = computed<Finding[]>(() => scan.value?.findings ?? [])
 
@@ -106,7 +106,19 @@ const formattedDuration = computed(() => {
 
   return `${scan.value.duration_seconds.toFixed(1)}s`
 })
-const refreshScan = () => Promise.all([loadResults(), loadHistory()])
+
+const formatBytes = (bytes?: number) => {
+  if (bytes === undefined) return '—'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`
+}
+const refreshScan = () => Promise.all([loadResults(), loadHistory(), loadInventory(), loadVulnerabilities(), loadPosture()])
 
 const compareWithSelectedScan = () => {
   if (comparisonTarget.value && scan.value?.scan_id) {
@@ -184,7 +196,7 @@ const startScan = async () => {
 
     <div v-if="error" class="error-banner">
       <div>
-        <strong>Unable to load scan results</strong>
+        <strong>{{ status === 'failed' ? 'Scan failed' : 'Unable to load scan results' }}</strong>
         <span>
           {{ error }}
         </span>
@@ -457,6 +469,139 @@ const startScan = async () => {
             <dd>{{ findings.length }}</dd>
           </div>
         </dl>
+      </article>
+
+      <article v-if="inventory" class="panel inventory-panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">HOST INVENTORY</span>
+            <h3>Runtime environment</h3>
+          </div>
+          <span class="count-badge">{{ inventory.scope }}</span>
+        </div>
+
+        <dl class="inventory-grid">
+          <div>
+            <dt>Hostname</dt>
+            <dd>{{ inventory.hostname }}</dd>
+          </div>
+          <div>
+            <dt>Operating system</dt>
+            <dd>{{ inventory.os.system }} {{ inventory.os.release }}</dd>
+          </div>
+          <div>
+            <dt>User</dt>
+            <dd>{{ inventory.current_user }}</dd>
+          </div>
+          <div>
+            <dt>CPU</dt>
+            <dd>{{ inventory.cpu.logical_count ?? '—' }} logical / {{ inventory.cpu.percent_used }}%</dd>
+          </div>
+          <div>
+            <dt>Memory</dt>
+            <dd>{{ inventory.memory.percent_used }}% used / {{ formatBytes(inventory.memory.total_bytes) }}</dd>
+          </div>
+          <div>
+            <dt>Processes</dt>
+            <dd>{{ inventory.processes.length }}</dd>
+          </div>
+          <div>
+            <dt>Network interfaces</dt>
+            <dd>{{ new Set(inventory.network_addresses.map((address) => address.interface)).size }}</dd>
+          </div>
+          <div>
+            <dt>Mounted disks</dt>
+            <dd>{{ inventory.disks.length }}</dd>
+          </div>
+          <div>
+            <dt>Runtime packages</dt>
+            <dd>{{ inventory.packages.length }}</dd>
+          </div>
+        </dl>
+
+        <div v-if="inventory.packages.length" class="package-list">
+          <div class="package-list-header">
+            <span class="card-label">INSTALLED PYTHON PACKAGES</span>
+            <span>{{ inventory.packages.length }} detected</span>
+          </div>
+          <ul>
+            <li v-for="packageInfo in inventory.packages.slice(0, 8)" :key="packageInfo.name">
+              <span>{{ packageInfo.name }}</span>
+              <code>{{ packageInfo.version }}</code>
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article v-if="vulnerabilities" class="panel vulnerability-panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">PACKAGE SECURITY</span>
+            <h3>Known vulnerabilities</h3>
+          </div>
+          <span :class="['count-badge', vulnerabilities.vulnerabilities.length ? 'risk-count' : '']">
+            {{ vulnerabilities.vulnerabilities.length }} found
+          </span>
+        </div>
+
+        <div v-if="vulnerabilities.status === 'unavailable'" class="history-empty">
+          Vulnerability database unavailable. Package inventory is still available.
+        </div>
+
+        <div v-else-if="vulnerabilities.vulnerabilities.length" class="vulnerability-list">
+          <div v-for="vulnerability in vulnerabilities.vulnerabilities.slice(0, 6)" :key="`${vulnerability.id}-${vulnerability.package}`" class="vulnerability-row">
+            <div>
+              <strong>{{ vulnerability.id ?? 'Advisory' }}</strong>
+              <span>{{ vulnerability.package }} {{ vulnerability.version }}</span>
+              <span v-if="vulnerability.severity" class="vulnerability-cvss">
+                CVSS {{ vulnerability.severity }}
+              </span>
+            </div>
+            <div class="vulnerability-detail">
+              <p>{{ vulnerability.summary || vulnerability.details || 'No description available.' }}</p>
+              <span v-if="vulnerability.fixed_versions.length" class="patched-version">
+                Patched in {{ vulnerability.fixed_versions.join(', ') }}
+              </span>
+              <strong class="vulnerability-fix">Fix: {{ vulnerability.remediation }}</strong>
+              <a
+                v-if="vulnerability.references[0]"
+                :href="vulnerability.references[0]"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Read advisory
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="empty-state compact-empty">
+          <strong>No known package vulnerabilities detected</strong>
+          <p>{{ vulnerabilities.packages_checked }} packages checked against OSV.</p>
+        </div>
+      </article>
+
+      <article v-if="posture" class="panel posture-panel">
+        <div class="panel-header">
+          <div>
+            <span class="card-label">CONFIGURATION</span>
+            <h3>Security posture</h3>
+          </div>
+          <span class="count-badge">
+            {{ posture.summary.failures }} failures / {{ posture.summary.warnings }} warnings
+          </span>
+        </div>
+
+        <div class="posture-list">
+          <div v-for="check in posture.checks" :key="check.id" class="posture-row">
+            <span :class="['posture-status', check.status]">{{ check.status }}</span>
+            <div>
+              <strong>{{ check.title }}</strong>
+              <p>{{ check.description }}</p>
+              <small>Fix: {{ check.remediation }}</small>
+            </div>
+          </div>
+        </div>
       </article>
 
       <article class="panel comparison-panel">
