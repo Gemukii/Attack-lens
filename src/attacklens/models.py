@@ -14,10 +14,13 @@ class Finding:
     description: str
     evidence: str = ""
     remediation: str = ""
+    risk_reason: str = ""
     references: list[str] = field(default_factory=list)
     port: int | None = None
     service: str | None = None
     protocol: str | None = None
+    version: str | None = None
+    banner: str | None = None
     cve: str | None = None
     cvss: float | None = None
 

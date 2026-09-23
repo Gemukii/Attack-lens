@@ -18,6 +18,11 @@ def test_save_results(tmp_path) -> None:
             description="Test description",
             evidence="127.0.0.1:22/tcp",
             remediation="Restrict access.",
+            port=22,
+            service="SSH",
+            protocol="tcp",
+            version="OpenSSH_9.0",
+            banner="SSH-2.0-OpenSSH_9.0",
         )
     ]
 
@@ -36,3 +41,6 @@ def test_save_results(tmp_path) -> None:
     assert data["scan_type"] == "network"
     assert len(data["findings"]) == 1
     assert data["findings"][0]["title"] == "Test finding"
+    assert data["score"] == 90
+    assert data["open_ports"] == [22]
+    assert data["services"][0]["version"] == "OpenSSH_9.0"
