@@ -1,17 +1,34 @@
-FROM node:22-alpine
+FROM node:22-alpine3.23 AS build
 
 WORKDIR /app
 
-COPY package*.json ./
+RUN apk upgrade --no-cache
 
-RUN npm install
+RUN chown node:node /app
 
-COPY . .
+COPY --chown=node:node package*.json ./
 
-RUN chown -R node:node /app
+USER node
+
+RUN npm ci --legacy-peer-deps --ignore-scripts
+
+COPY --chown=node:node . .
+
+RUN npm run postinstall \
+	&& npm run build
+
+FROM node:22-alpine3.23 AS runtime
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+	HOST=0.0.0.0 \
+	PORT=3000
+
+COPY --from=build --chown=node:node /app/.output ./.output
 
 USER node
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["node", ".output/server/index.mjs"]
