@@ -29,6 +29,26 @@ def test_get_results_returns_404_when_no_scan_exists(tmp_path, monkeypatch) -> N
     assert response.json()["detail"] == "No scan results available."
 
 
+def test_get_results_rejects_corrupt_json(tmp_path, monkeypatch) -> None:
+    """Corrupt latest results should produce a controlled client error."""
+    result_path = tmp_path / "latest.json"
+    result_path.write_text("{broken", encoding="utf-8")
+    monkeypatch.setattr(api, "RESULTS_PATH", result_path)
+
+    response = client.get("/api/results")
+
+    assert response.status_code == 422
+
+
+def test_compare_rejects_path_traversal(tmp_path, monkeypatch) -> None:
+    """Comparison identifiers must remain confined to the history directory."""
+    monkeypatch.setattr(api, "HISTORY_PATH", tmp_path / "history")
+
+    response = client.get("/api/scans/compare?before_id=../secret&after_id=after")
+
+    assert response.status_code == 422
+
+
 def test_post_scan_returns_persisted_result(tmp_path, monkeypatch) -> None:
     """POST /api/scan should synchronously return the stored result document."""
     monkeypatch.setattr(api, "RESULTS_PATH", tmp_path / "latest.json")

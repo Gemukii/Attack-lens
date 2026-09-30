@@ -67,3 +67,19 @@ def test_query_package_vulnerabilities_is_non_fatal(monkeypatch) -> None:
 
     assert report["status"] == "unavailable"
     assert report["vulnerabilities"] == []
+
+
+def test_query_package_vulnerabilities_rejects_malformed_response(monkeypatch) -> None:
+    """Unexpected OSV shapes should not break the API endpoint."""
+    class MalformedResponse(FakeResponse):
+        def read(self):
+            return json.dumps({"results": [None, {"vulns": [None]}]}).encode()
+
+    monkeypatch.setattr(vulnerabilities, "urlopen", lambda request, timeout: MalformedResponse())
+
+    report = vulnerabilities.query_package_vulnerabilities(
+        [{"name": "example-package", "version": "1.2.3"}]
+    )
+
+    assert report["status"] == "complete"
+    assert report["vulnerabilities"] == []

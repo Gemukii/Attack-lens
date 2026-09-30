@@ -43,27 +43,43 @@ def query_package_vulnerabilities(
             "vulnerabilities": [],
         }
 
+    if not isinstance(body, dict) or not isinstance(body.get("results"), list):
+        return {
+            "status": "unavailable",
+            "packages_checked": len(queries),
+            "vulnerabilities": [],
+        }
+
     vulnerabilities: list[dict[str, Any]] = []
-    for package, result in zip(checked_packages, body.get("results", []), strict=False):
-        for vulnerability in result.get("vulns", []):
+    for package, result in zip(checked_packages, body["results"], strict=False):
+        if not isinstance(result, dict) or not isinstance(result.get("vulns", []), list):
+            continue
+        for vulnerability in result["vulns"]:
+            if not isinstance(vulnerability, dict):
+                continue
             fixed_versions = sorted(
                 {
                     change["fixed"]
                     for affected in vulnerability.get("affected", [])
+                    if isinstance(affected, dict)
                     for version_range in affected.get("ranges", [])
+                    if isinstance(version_range, dict)
                     for change in version_range.get("events", [])
+                    if isinstance(change, dict)
                     if change.get("fixed")
                 }
             )
             references = [
                 reference["url"]
                 for reference in vulnerability.get("references", [])
+                if isinstance(reference, dict)
                 if reference.get("url")
             ]
             severity = next(
                 (
                     item.get("score")
                     for item in vulnerability.get("severity", [])
+                    if isinstance(item, dict)
                     if item.get("score")
                 ),
                 None,

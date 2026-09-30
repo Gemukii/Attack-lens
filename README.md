@@ -185,6 +185,24 @@ reached.
 including root privileges, Docker socket exposure, sensitive environment
 variable names, and host firewall visibility.
 
+The `score` is a bounded network-exposure score from 0 to 100. It is calculated
+from network finding severities only; package vulnerabilities and posture checks
+remain separate reports because they use different evidence and risk scales.
+
+The CLI and API share their result directory through `ATTACKLENS_RESULTS_DIR`.
+Docker Compose binds the local `results/` directory to `/app/results`, so scans
+run on the host and scans run by the API use the same files. The API also
+supports these optional safeguards:
+
+* `ATTACKLENS_API_KEY` protects API endpoints with the `X-API-Key` header.
+* `ATTACKLENS_CORS_ORIGINS` configures the comma-separated allowed origins.
+* `ATTACKLENS_ALLOWED_TARGETS` limits scans to a comma-separated host allowlist.
+* Only one network scan runs at a time; concurrent requests receive HTTP 429.
+
+Results are written through temporary files and atomically replaced. Invalid
+stored documents are rejected by the API instead of being returned as a 500
+error, and historical comparisons use stable finding identifiers.
+
 When running with Docker, the default target is `host.docker.internal`, which
 refers to the host machine from inside the API container. Override it with
 `ATTACKLENS_DEFAULT_TARGET` when scanning another host.

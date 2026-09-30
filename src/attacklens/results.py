@@ -1,11 +1,47 @@
 """Scan result persistence for AttackLens."""
 
 import json
+import os
+import tempfile
+from threading import Lock
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from attacklens.models import Finding
+
+
+_WRITE_LOCK = Lock()
+SEVERITY_WEIGHTS = {"critical": 35, "high": 20, "medium": 10, "low": 4}
+
+
+def calculate_score(findings: list[Finding]) -> int:
+    """Calculate the bounded network risk score."""
+    penalty = sum(SEVERITY_WEIGHTS.get(finding.severity.lower(), 0) for finding in findings)
+    return max(0, min(100, 100 - penalty))
+
+
+def _atomic_write_json(data: dict[str, Any], path: Path) -> None:
+    """Write JSON beside the destination, then replace it atomically."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as file:
+            temporary_path = file.name
+            json.dump(data, file, indent=2, ensure_ascii=False)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path is not None and os.path.exists(temporary_path):
+            os.unlink(temporary_path)
 
 
 def save_results(
@@ -16,7 +52,7 @@ def save_results(
     duration_seconds: float | None = None,
     scan_id: str | None = None,
     history_path: Path | None = None,
-) -> None:
+) -> dict[str, Any]:
     """Save scan findings to a JSON file."""
     data: dict[str, Any] = {
         "target": target,
@@ -31,12 +67,7 @@ def save_results(
     if duration_seconds is not None:
         data["duration_seconds"] = round(duration_seconds, 3)
 
-    severity_weights = {"critical": 35, "high": 20, "medium": 10, "low": 4}
-    score = 100 - sum(
-        severity_weights.get(finding.severity.lower(), 0)
-        for finding in findings
-    )
-    data["score"] = max(0, min(100, score))
+    data["score"] = calculate_score(findings)
     data["open_ports"] = [
         finding.port
         for finding in findings
@@ -54,12 +85,8 @@ def save_results(
         if finding.category == "network"
     ]
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with path.open("w", encoding="utf-8") as file:
-        json.dump(data, file, indent=2, ensure_ascii=False)
-
-    if history_path is not None:
-        history_path.parent.mkdir(parents=True, exist_ok=True)
-        with history_path.open("w", encoding="utf-8") as file:
-            json.dump(data, file, indent=2, ensure_ascii=False)
+    with _WRITE_LOCK:
+        _atomic_write_json(data, path)
+        if history_path is not None:
+            _atomic_write_json(data, history_path)
+    return data

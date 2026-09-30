@@ -1,6 +1,8 @@
 """Data models used by AttackLens."""
 
 from dataclasses import asdict, dataclass, field
+import hashlib
+import json
 from typing import Any
 
 
@@ -24,6 +26,20 @@ class Finding:
     cve: str | None = None
     cvss: float | None = None
 
+    def stable_id(self) -> str:
+        """Return an identity that survives changes to volatile evidence."""
+        identity = {
+            "category": self.category,
+            "service": self.service,
+            "port": self.port,
+            "protocol": self.protocol,
+            "title": self.title,
+        }
+        encoded = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(encoded).hexdigest()
+
     def to_dict(self) -> dict[str, Any]:
         """Convert the finding to a JSON-serializable dictionary."""
-        return asdict(self)
+        data = asdict(self)
+        data["finding_id"] = self.stable_id()
+        return data

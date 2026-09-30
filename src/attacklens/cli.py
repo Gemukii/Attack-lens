@@ -1,10 +1,16 @@
 """Command-line interface for AttackLens."""
 import argparse
 import json
+import os
 from pathlib import Path
 
 from attacklens.results import save_results
 from attacklens.scanner import scan_network
+
+
+def results_directory() -> Path:
+    """Return the shared result directory used by the CLI and API."""
+    return Path(os.getenv("ATTACKLENS_RESULTS_DIR", "results"))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -53,7 +59,7 @@ def main() -> None:
         findings = scan_network(args.host)
         save_results(
             findings=findings,
-            path=Path("results/latest.json"),
+            path=results_directory() / "latest.json",
             target=args.host,
             scan_type="network",
         )
