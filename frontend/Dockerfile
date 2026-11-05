@@ -1,4 +1,4 @@
-FROM node:22-alpine3.23@sha256:6abbcf5dd6b231da109bcde1181db1d92bf78015ae1a9514d9807c1f857869db AS build
+FROM node:26-alpine3.23@sha256:e6c03d42b46af3b1e98207e59f06a43cfe5efd3ec4b4d3d9802bddf04f833374 AS build
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY --chown=node:node . .
 RUN npm run postinstall \
 	&& npm run build
 
-FROM node:22-alpine3.23@sha256:6abbcf5dd6b231da109bcde1181db1d92bf78015ae1a9514d9807c1f857869db AS runtime
+FROM node:26-alpine3.23@sha256:e6c03d42b46af3b1e98207e59f06a43cfe5efd3ec4b4d3d9802bddf04f833374 AS runtime
 
 WORKDIR /app
 
