@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { Alert, ScanComparison, ScanHistory } from '~/types/scan'
+import type { Alert, ExposureReport, ScanComparison, ScanHistory } from '~/types/scan'
 
 const props = defineProps<{
   alerts: Alert[]
   history: ScanHistory
   comparison: ScanComparison | null
   currentScanId?: string
+  exposure: ExposureReport | null
 }>()
 
 const emit = defineEmits<{
@@ -37,13 +38,15 @@ const delta = computed(() => {
 
       <ul v-if="alerts.length">
         <li v-for="alert in alerts.slice(0, 4)" :key="alert.alert_id" class="alert-item">
-          <strong>{{ alert.findings.length }} new on {{ alert.target }}</strong>
+          <strong>{{ alert.findings.length ? `${alert.findings.length} new on ${alert.target}` : alert.message.replace('AttackLens: ', '') }}</strong>
           <time :datetime="alert.created_at">{{ formatDate(alert.created_at) }}</time>
           <span v-for="finding in alert.findings.slice(0, 3)" :key="finding.finding_id">{{ finding.title }}</span>
         </li>
       </ul>
       <p v-else class="note">Nothing new since the first scan of each target.</p>
     </section>
+
+    <ExposurePanel :report="exposure" />
 
     <section>
       <span class="eyebrow">Compare with</span>

@@ -19,6 +19,9 @@ export default defineEventHandler((event) => {
   }
 
   return proxyRequest(event, `${config.apiInternalBase}${event.path}`, {
-    headers: config.apiKey ? { 'X-API-Key': config.apiKey } : {},
+    headers: {
+      'X-AttackLens-Actor': 'dashboard',
+      ...(config.apiKey ? { 'X-API-Key': config.apiKey } : {}),
+    },
   })
 })

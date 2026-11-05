@@ -18,10 +18,18 @@ from typing import Any
 
 import psutil
 
+from attacklens.intel import enrich
 from attacklens.models import Finding
 from attacklens.results import build_document
 from attacklens.scanner import COMMON_PORTS, SERVICE_RISK_RULES
 from attacklens.vulnerabilities import osv_enabled, query_package_vulnerabilities
+from attacklens.windows_posture import (
+    collect_outdated_software,
+    collect_windows_posture,
+    persistence_findings,
+    posture_findings,
+    software_findings,
+)
 
 COMMAND_TIMEOUT_SECONDS = 15
 EXPOSURE_RANK = {"loopback": 0, "interface": 1, "all": 2}
@@ -409,13 +417,20 @@ def firewall_findings(target: str, firewall: dict[str, Any]) -> list[Finding]:
     ]
 
 
+def _vulnerability_severity(item: dict[str, Any], severities: set[str]) -> str:
+    """Rate an advisory. Active exploitation outweighs any published score."""
+    if item.get("known_exploited"):
+        return "critical"
+    return item["severity"] if item["severity"] in severities else "medium"
+
+
 def vulnerability_findings(target: str, report: dict[str, Any]) -> list[Finding]:
     """Turn OSV advisories that have a fix into findings."""
     severities = {"critical", "high", "medium", "low"}
     return [
         Finding(
             category="vulnerability",
-            severity=item["severity"] if item["severity"] in severities else "medium",
+            severity=_vulnerability_severity(item, severities),
             risk_reason=(
                 ""
                 if item["severity"] in severities
@@ -428,9 +443,13 @@ def vulnerability_findings(target: str, report: dict[str, Any]) -> list[Finding]
             references=item["references"][:5],
             target=target,
             service=item["package"],
+            cve=item.get("cve"),
+            known_exploited=item.get("known_exploited"),
+            epss=item.get("epss"),
         )
         for item in report["vulnerabilities"]
-        if item["fixed_versions"]
+        # Without a fix there is nothing to do, unless attackers are already using the flaw.
+        if item["fixed_versions"] or item.get("known_exploited")
     ]
 
 
@@ -440,7 +459,38 @@ def _check_vulnerabilities(packages: dict[str, Any]) -> dict[str, Any]:
         return {"status": "not_covered", "packages_checked": 0, "vulnerabilities": []}
     if not osv_enabled():
         return {"status": "disabled", "packages_checked": 0, "vulnerabilities": []}
-    return query_package_vulnerabilities(packages["items"], ecosystem=packages["ecosystem"])
+    report = query_package_vulnerabilities(packages["items"], ecosystem=packages["ecosystem"])
+    return enrich(report)
+
+
+def local_addresses() -> list[str]:
+    """Return the IPv4 addresses of this machine, except loopback."""
+    return sorted(
+        entry.address
+        for entries in psutil.net_if_addrs().values()
+        for entry in entries
+        if entry.family == socket.AF_INET and not entry.address.startswith("127.")
+    )
+
+
+def collect_platform_posture() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return the posture and the outdated software, where they can be read."""
+    if sys.platform == "win32":
+        return collect_windows_posture(), collect_outdated_software()
+    return {"status": "not_covered", "autoruns": []}, {"status": "not_covered", "items": []}
+
+
+def platform_findings(
+    target: str, posture: dict[str, Any], outdated: dict[str, Any]
+) -> list[Finding]:
+    """Evaluate the posture of the platforms that report one."""
+    if posture["status"] == "not_covered":
+        return []
+    return [
+        *posture_findings(target, posture),
+        *persistence_findings(target, posture),
+        *software_findings(target, outdated),
+    ]
 
 
 def collect_host_report() -> dict[str, Any]:
@@ -451,11 +501,13 @@ def collect_host_report() -> dict[str, Any]:
     firewall = collect_firewall()
     packages = collect_packages()
     vulnerabilities = _check_vulnerabilities(packages)
+    posture, outdated = collect_platform_posture()
 
     findings = [
         *listener_findings(target, listeners["items"], firewall["status"]),
         *firewall_findings(target, firewall),
         *vulnerability_findings(target, vulnerabilities),
+        *platform_findings(target, posture, outdated),
     ]
     return build_document(
         findings=findings,
@@ -472,8 +524,13 @@ def collect_host_report() -> dict[str, Any]:
                 "release": platform.release(),
                 "version": platform.version(),
             },
+            "addresses": local_addresses(),
             "listeners": listeners,
             "firewall": firewall,
+            "posture": {key: value for key, value in posture.items() if key != "autoruns"},
+            "autorun_count": len(posture.get("autoruns", [])),
+            "outdated_count": len(outdated.get("items", [])),
+            "outdated_status": outdated.get("status"),
             "packages": packages,
             "vulnerabilities": {
                 "status": vulnerabilities["status"],

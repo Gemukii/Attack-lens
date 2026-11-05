@@ -22,6 +22,12 @@ from attacklens.host import (
 )
 
 Address = namedtuple("Address", "ip port")
+
+
+def NO_POSTURE():
+    return {"status": "not_covered", "autoruns": []}, {"status": "not_covered", "items": []}
+
+
 Connection = namedtuple("Connection", "laddr status pid")
 
 
@@ -307,6 +313,7 @@ def test_host_report_never_contacts_osv_unless_enabled(monkeypatch) -> None:
 
     monkeypatch.setattr(host, "query_package_vulnerabilities", forbidden)
     monkeypatch.setattr(host, "collect_firewall", lambda: {"status": "enabled", "profiles": []})
+    monkeypatch.setattr(host, "collect_platform_posture", NO_POSTURE)
 
     assert collect_host_report()["vulnerabilities"]["status"] == "disabled"
 
@@ -320,6 +327,7 @@ def test_host_report_without_listener_access_is_partial(monkeypatch) -> None:
     monkeypatch.setattr(
         host, "collect_packages", lambda: {"status": "complete", "ecosystem": None, "items": []}
     )
+    monkeypatch.setattr(host, "collect_platform_posture", NO_POSTURE)
 
     report = collect_host_report()
 

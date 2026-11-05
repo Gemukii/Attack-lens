@@ -3,10 +3,12 @@
 import re
 import socket
 import ssl
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
+from attacklens.checks import verify_service
 from attacklens.models import Finding
 
 # Windows retries a refused connection for about two seconds, so a shorter timeout
@@ -342,6 +344,10 @@ def _build_finding(
     """Turn an open port into a classified finding."""
     severity, risk_reason, remediation = classify_service(port)
     version, banner = identify_service(host, address, port, service)
+    verification = verify_service(host, address, port)
+    if verification is not None:
+        severity = verification.severity or severity
+        risk_reason = verification.detail
     return Finding(
         category="network",
         severity=severity,
@@ -356,6 +362,7 @@ def _build_finding(
         protocol="tcp",
         version=version,
         banner=banner,
+        verification=verification.state if verification else None,
     )
 
 
@@ -363,6 +370,7 @@ def scan_network(
     host: str = "127.0.0.1",
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     asset: str | None = None,
+    extra_ports: Iterable[int] = (),
 ) -> NetworkScan:
     """Scan common TCP ports on a host and report what could be observed.
 
@@ -370,7 +378,7 @@ def scan_network(
     through an address that changes keeps its findings under a stable name this way.
     """
     address = resolve_target(host)
-    ports = sorted(COMMON_PORTS)
+    ports = sorted({*COMMON_PORTS, *extra_ports})
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         states = dict(
@@ -384,7 +392,7 @@ def scan_network(
         findings = list(
             executor.map(
                 lambda port: _build_finding(
-                    host, asset or host, address, port, COMMON_PORTS[port]
+                    host, asset or host, address, port, COMMON_PORTS.get(port, "Unknown")
                 ),
                 open_ports,
             )

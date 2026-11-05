@@ -17,7 +17,7 @@ from uuid import uuid4
 
 from attacklens.models import finding_identity
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
@@ -50,6 +50,31 @@ CREATE TABLE IF NOT EXISTS agents (
     version TEXT,
     address TEXT,
     last_seen TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS agent_tokens (
+    hostname TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS enrollment_codes (
+    code_hash TEXT PRIMARY KEY,
+    expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS engagements (
+    engagement_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    authorized_by TEXT NOT NULL,
+    reference TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+    entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT
 );
 CREATE TABLE IF NOT EXISTS agent_jobs (
     job_id TEXT PRIMARY KEY,
@@ -120,9 +145,22 @@ class Store:
             connection.execute("PRAGMA journal_mode=WAL")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             connection.executescript(SCHEMA)
+            self._add_missing_columns(connection)
             if version == 0 and legacy_directory is not None:
                 self._import_legacy(connection, legacy_directory)
             connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+
+    @staticmethod
+    def _add_missing_columns(connection: sqlite3.Connection) -> None:
+        """Upgrade tables created by earlier versions."""
+        for table, column in (
+            ("finding_triage", "expires_at"),
+            ("finding_triage", "fingerprint"),
+            ("agents", "silent_since"),
+        ):
+            existing = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+            if column not in existing:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -226,11 +264,19 @@ class Store:
         """Return the triage decisions, by finding identifier."""
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT finding_id, status, reason, updated_at FROM finding_triage"
+                "SELECT finding_id, status, reason, updated_at, expires_at, fingerprint "
+                "FROM finding_triage"
             ).fetchall()
         return {row["finding_id"]: dict(row) for row in rows}
 
-    def set_triage(self, finding_id: str, status: str, reason: str | None) -> None:
+    def set_triage(
+        self,
+        finding_id: str,
+        status: str,
+        reason: str | None,
+        expires_at: str | None = None,
+        fingerprint: str | None = None,
+    ) -> None:
         """Record a triage decision. Reopening a finding removes the decision."""
         with self._connect() as connection:
             if status == "open":
@@ -239,10 +285,26 @@ class Store:
                 )
                 return
             connection.execute(
-                "INSERT OR REPLACE INTO finding_triage (finding_id, status, reason, updated_at) "
-                "VALUES (?, ?, ?, ?)",
-                (finding_id, status, reason, datetime.now(UTC).isoformat()),
+                "INSERT OR REPLACE INTO finding_triage "
+                "(finding_id, status, reason, updated_at, expires_at, fingerprint) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    finding_id,
+                    status,
+                    reason,
+                    datetime.now(UTC).isoformat(),
+                    expires_at,
+                    fingerprint,
+                ),
             )
+
+    def find_finding(self, finding_id: str, recent_scans: int = 200) -> dict[str, Any] | None:
+        """Return the most recent occurrence of a finding."""
+        for scan in self.list_scans(limit=recent_scans):
+            for finding in scan.get("findings", []):
+                if finding.get("finding_id") == finding_id:
+                    return finding
+        return None
 
     def add_alert(
         self,
@@ -271,9 +333,18 @@ class Store:
         """Record that an agent is alive."""
         with self._connect() as connection:
             connection.execute(
-                "INSERT OR REPLACE INTO agents (hostname, platform, version, address, last_seen) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO agents (hostname, platform, version, address, last_seen) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT (hostname) DO UPDATE SET "
+                "platform = excluded.platform, version = excluded.version, "
+                "address = excluded.address, last_seen = excluded.last_seen",
                 (hostname, platform, version, address, datetime.now(UTC).isoformat()),
+            )
+
+    def set_agent_silent(self, hostname: str, since: str | None) -> None:
+        """Record when an agent went silent, or clear it when it comes back."""
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE agents SET silent_since = ? WHERE hostname = ?", (since, hostname)
             )
 
     def list_agents(self) -> list[dict[str, Any]]:
@@ -363,6 +434,122 @@ class Store:
                 (status, error, scan_id, datetime.now(UTC).isoformat(), job_id),
             )
         return finished.rowcount == 1
+
+    def create_enrollment_code(self, code_hash: str, expires_at: str) -> None:
+        """Store a one-time enrollment code, as a hash."""
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM enrollment_codes WHERE expires_at < ?",
+                (datetime.now(UTC).isoformat(),),
+            )
+            connection.execute(
+                "INSERT INTO enrollment_codes (code_hash, expires_at) VALUES (?, ?)",
+                (code_hash, expires_at),
+            )
+
+    def consume_enrollment_code(self, code_hash: str) -> bool:
+        """Use a code. It works once, and only until it expires."""
+        with self._connect() as connection:
+            used = connection.execute(
+                "DELETE FROM enrollment_codes WHERE code_hash = ? AND expires_at >= ?",
+                (code_hash, datetime.now(UTC).isoformat()),
+            )
+        return used.rowcount == 1
+
+    def set_agent_token(self, hostname: str, token_hash: str) -> None:
+        """Give an agent its identity, replacing any previous one."""
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_tokens (hostname, token_hash, created_at) "
+                "VALUES (?, ?, ?)",
+                (hostname, token_hash, datetime.now(UTC).isoformat()),
+            )
+
+    def agent_for_token(self, token_hash: str) -> str | None:
+        """Return the machine a token belongs to."""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT hostname FROM agent_tokens WHERE token_hash = ?", (token_hash,)
+            ).fetchone()
+        return row["hostname"] if row else None
+
+    def revoke_agent(self, hostname: str) -> bool:
+        """Remove an agent and invalidate its token at once."""
+        with self._connect() as connection:
+            removed = connection.execute(
+                "DELETE FROM agent_tokens WHERE hostname = ?", (hostname,)
+            )
+            connection.execute("DELETE FROM agents WHERE hostname = ?", (hostname,))
+        return removed.rowcount == 1
+
+    def create_engagement(self, engagement: dict[str, Any]) -> dict[str, Any]:
+        """Record an authorized engagement and its scope."""
+        stored = {**engagement, "engagement_id": str(uuid4())}
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO engagements (engagement_id, name, authorized_by, reference, "
+                "scope, starts_at, ends_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    stored["engagement_id"],
+                    stored["name"],
+                    stored["authorized_by"],
+                    stored["reference"],
+                    json.dumps(stored["scope"]),
+                    stored["starts_at"],
+                    stored["ends_at"],
+                ),
+            )
+        return stored
+
+    def list_engagements(self) -> list[dict[str, Any]]:
+        """Return the engagements, latest first."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM engagements ORDER BY starts_at DESC"
+            ).fetchall()
+        return [{**dict(row), "scope": json.loads(row["scope"])} for row in rows]
+
+    def add_audit(self, actor: str, action: str, detail: str | None = None) -> None:
+        """Record a security-relevant action."""
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO audit_log (at, actor, action, detail) VALUES (?, ?, ?, ?)",
+                (datetime.now(UTC).isoformat(), actor, action, detail),
+            )
+
+    def list_audit(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Return the journal, newest first."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM audit_log ORDER BY entry_id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def backup(self, destination: Path) -> None:
+        """Write a consistent copy of the database, even while it is in use."""
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_suffix(".tmp")
+        target = sqlite3.connect(temporary)
+        try:
+            with self._connect() as connection:
+                connection.backup(target)
+        finally:
+            target.close()
+        temporary.replace(destination)
+
+    def prune(self, retention_days: int) -> int:
+        """Delete old scans, always keeping the latest scan of each asset."""
+        limit = (datetime.now(UTC) - timedelta(days=retention_days)).isoformat()
+        with self._connect() as connection:
+            removed = connection.execute(
+                "DELETE FROM scans WHERE completed_at < ? AND scan_id NOT IN ("
+                "SELECT scan_id FROM (SELECT scan_id, ROW_NUMBER() OVER ("
+                "PARTITION BY scan_type, target ORDER BY completed_at DESC) AS position "
+                "FROM scans) WHERE position = 1)",
+                (limit,),
+            )
+        return removed.rowcount
 
     def list_alerts(self, limit: int = 20) -> list[dict[str, Any]]:
         """Return alerts, newest first."""

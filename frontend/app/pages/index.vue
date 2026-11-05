@@ -2,7 +2,7 @@
 import type { Finding, TriageStatus } from '~/types/scan'
 import { useScan } from '~/composables/useScan'
 
-const { results: scan, history, comparison, inventory, vulnerabilities, posture, hostReport, alerts, agent, status, error, loadAll, loadAgents, compareScans, runScan, setTriage } = useScan()
+const { results: scan, history, comparison, inventory, vulnerabilities, posture, hostReport, alerts, agent, silentAgent, paths, exposure, audit, status, error, loadAll, loadAgents, compareScans, runScan, setTriage, createEnrollmentCode } = useScan()
 const config = useRuntimeConfig()
 const dockerTarget = String(config.public.scanTarget)
 
@@ -10,7 +10,7 @@ const target = ref('')
 const selectedFinding = ref<Finding | null>(null)
 const copied = ref(false)
 const scanning = computed(() => status.value === 'running')
-const AGENT_COMMAND = 'attacklens agent --watch --api-url http://127.0.0.1:8000'
+const enrollCommand = ref<string | null>(null)
 
 let agentTimer: ReturnType<typeof setInterval> | undefined
 
@@ -104,9 +104,9 @@ const scanLabel = computed(() => {
 
 const startScan = () => runScan(target.value.trim(), dockerTarget)
 
-const decide = async (decision: TriageStatus, reason: string) => {
+const decide = async (decision: TriageStatus, reason: string, days: number) => {
   if (!selectedFinding.value?.finding_id) return
-  await setTriage(selectedFinding.value.finding_id, decision, reason)
+  await setTriage(selectedFinding.value.finding_id, decision, reason, days || undefined)
   selectedFinding.value = null
 }
 
@@ -114,8 +114,14 @@ const compareWith = (scanId: string) => {
   if (scan.value?.scan_id) return compareScans(scanId, scan.value.scan_id)
 }
 
+const prepareEnrollment = async () => {
+  const code = await createEnrollmentCode()
+  if (code) enrollCommand.value = `attacklens enroll ${code}`
+}
+
 const copyCommand = async () => {
-  await navigator.clipboard.writeText(AGENT_COMMAND)
+  if (!enrollCommand.value) return
+  await navigator.clipboard.writeText(enrollCommand.value)
   copied.value = true
   setTimeout(() => (copied.value = false), 1600)
 }
@@ -134,7 +140,7 @@ const copyCommand = async () => {
 
       <div class="agent-state" role="status">
         <span :class="['agent-dot', { online: agent }]" />
-        <span>{{ agent ? `Agent connected · ${agent.hostname}` : 'Agent offline' }}</span>
+        <span>{{ agent ? `Agent connected · ${agent.hostname}` : silentAgent ? `Agent silent since ${formatDate(silentAgent.silent_since ?? undefined)}` : 'Agent offline' }}</span>
       </div>
 
       <form class="controls" @submit.prevent="startScan">
@@ -149,6 +155,7 @@ const copyCommand = async () => {
             spellcheck="false"
           />
         </label>
+        <a v-if="scan" class="button" :href="`/api/report${hostReport ? `?target=${encodeURIComponent(hostReport.target)}` : ''}`" target="_blank" rel="noopener">Report</a>
         <button class="button" type="button" :disabled="scanning" @click="loadAll">Refresh</button>
         <button class="button primary" type="submit" :disabled="scanning">{{ scanLabel }}</button>
       </form>
@@ -161,9 +168,11 @@ const copyCommand = async () => {
     </div>
 
     <div v-if="!agent" class="notice">
-      <strong>The agent is not running.</strong>
-      <span>Start it on this machine to scan from here: <code>{{ AGENT_COMMAND }}</code></span>
-      <button class="button small" type="button" @click="copyCommand">{{ copied ? 'Copied' : 'Copy' }}</button>
+      <strong>{{ silentAgent ? 'This machine is no longer monitored.' : 'The agent is not running.' }}</strong>
+      <span v-if="enrollCommand">Run this on the other machine: <code>{{ enrollCommand }}</code></span>
+      <span v-else>Launch AttackLens with <code>attacklens start</code>, which runs the agent too. Another machine? Create a one-time code.</span>
+      <button v-if="enrollCommand" class="button small" type="button" @click="copyCommand">{{ copied ? 'Copied' : 'Copy' }}</button>
+      <button v-else class="button small" type="button" @click="prepareEnrollment">Enroll a machine</button>
     </div>
 
     <main>
@@ -208,8 +217,8 @@ const copyCommand = async () => {
           <dd>{{ listenersBeyondLoopback }} of {{ hostReport.listeners.items.length }} listeners</dd>
         </div>
         <div>
-          <dt class="eyebrow">Installed software</dt>
-          <dd>{{ hostReport.packages.items.length }}</dd>
+          <dt class="eyebrow">Updates available</dt>
+          <dd>{{ hostReport.outdated_count ?? '—' }} of {{ hostReport.packages.items.length }} programs</dd>
         </div>
         <div>
           <dt class="eyebrow">Known vulnerabilities</dt>
@@ -217,7 +226,9 @@ const copyCommand = async () => {
         </div>
       </dl>
 
-      <section class="desk develop" style="--i: 3">
+      <AttackPaths class="develop" style="--i: 3" :report="paths" />
+
+      <section class="desk develop" style="--i: 4">
         <FindingLedger
           :network="findings"
           :host="hostReport?.findings ?? []"
@@ -231,11 +242,12 @@ const copyCommand = async () => {
           :history="history"
           :comparison="comparison"
           :current-scan-id="scan?.scan_id"
+          :exposure="exposure"
           @compare="compareWith"
         />
       </section>
 
-      <RuntimePanel :inventory="inventory" :vulnerabilities="vulnerabilities" :posture="posture" />
+      <RuntimePanel :inventory="inventory" :vulnerabilities="vulnerabilities" :posture="posture" :audit="audit" />
     </main>
 
     <FindingDrawer :finding="selectedFinding" @close="selectedFinding = null" @decide="decide" />

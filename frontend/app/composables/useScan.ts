@@ -1,4 +1,4 @@
-import type { Agent, Alert, HostInventory, HostReport, PostureReport, ScanComparison, ScanHistory, ScanResults, ScanStatus, TriageStatus, VulnerabilityReport } from '~/types/scan'
+import type { Agent, Alert, AttackPathReport, AuditEntry, ExposureReport, HostInventory, HostReport, PostureReport, ScanComparison, ScanHistory, ScanResults, ScanStatus, TriageStatus, VulnerabilityReport } from '~/types/scan'
 import { createScanApi } from '~/utils/scanApi'
 
 const JOB_POLL_MS = 800
@@ -32,6 +32,10 @@ export const useScan = () => {
   const alerts = ref<Alert[]>([])
   const agents = ref<Agent[]>([])
   const agent = computed(() => agents.value.find((item) => item.online) ?? null)
+  const silentAgent = computed(() => agents.value.find((item) => item.silent_since) ?? null)
+  const paths = ref<AttackPathReport | null>(null)
+  const exposure = ref<ExposureReport | null>(null)
+  const audit = ref<AuditEntry[]>([])
 
   const loadResults = async () => {
     try {
@@ -61,6 +65,22 @@ export const useScan = () => {
       hostReport.value = await api.getHostReport()
     } catch {
       hostReport.value = null
+    }
+  }
+
+  const loadAnalysis = async () => {
+    const [nextPaths, nextExposure, nextAudit] = await Promise.allSettled([api.getPaths(), api.getExposure(), api.getAudit()])
+    paths.value = nextPaths.status === 'fulfilled' ? nextPaths.value : null
+    exposure.value = nextExposure.status === 'fulfilled' ? nextExposure.value : null
+    audit.value = nextAudit.status === 'fulfilled' ? nextAudit.value : []
+  }
+
+  const createEnrollmentCode = async () => {
+    try {
+      return (await api.createEnrollmentCode()).code
+    } catch (cause: unknown) {
+      error.value = getApiErrorMessage(cause, 'Unable to create an enrollment code.')
+      return null
     }
   }
 
@@ -111,7 +131,7 @@ export const useScan = () => {
     error.value = null
     if (status.value !== 'running') status.value = 'loading'
     await loadResults()
-    await Promise.all([loadHistory(), loadHostReport(), loadAlerts(), loadAgents(), loadInventory(), loadVulnerabilities(), loadPosture()])
+    await Promise.all([loadHistory(), loadHostReport(), loadAlerts(), loadAgents(), loadAnalysis(), loadInventory(), loadVulnerabilities(), loadPosture()])
   }
 
   const waitForJob = async (jobId: string) => {
@@ -138,7 +158,7 @@ export const useScan = () => {
         await api.runScan({ target: target || fallbackTarget })
       }
       status.value = 'completed'
-      await Promise.all([loadResults(), loadHostReport(), loadAlerts()])
+      await Promise.all([loadResults(), loadHostReport(), loadAlerts(), loadAnalysis()])
       await loadHistory()
     } catch (cause: unknown) {
       error.value = getApiErrorMessage(cause, 'The scan failed.')
@@ -155,14 +175,14 @@ export const useScan = () => {
     }
   }
 
-  const setTriage = async (findingId: string, triageStatus: TriageStatus, reason?: string) => {
+  const setTriage = async (findingId: string, triageStatus: TriageStatus, reason?: string, days?: number) => {
     try {
-      await api.setTriage(findingId, triageStatus, reason)
-      await Promise.all([loadResults(), loadHostReport()])
+      await api.setTriage(findingId, triageStatus, reason, days)
+      await Promise.all([loadResults(), loadHostReport(), loadAnalysis()])
     } catch (cause: unknown) {
       error.value = getApiErrorMessage(cause, 'Unable to save this decision.')
     }
   }
 
-  return { results, history, comparison, inventory, vulnerabilities, posture, hostReport, alerts, agent, status, error, loadAll, loadAgents, compareScans, runScan, setTriage }
+  return { results, history, comparison, inventory, vulnerabilities, posture, hostReport, alerts, agent, silentAgent, paths, exposure, audit, status, error, loadAll, loadAgents, compareScans, runScan, setTriage, createEnrollmentCode }
 }

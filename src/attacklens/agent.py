@@ -17,6 +17,8 @@ from attacklens.results import network_document
 from attacklens.scanner import TargetResolutionError, is_valid_target, scan_network
 
 POLL_SECONDS = 2.0
+# Without the API there is nothing to do: the agent only checks now and then.
+IDLE_SECONDS = 30.0
 LOOPBACK = "127.0.0.1"
 
 
@@ -96,20 +98,27 @@ def watch(
     next_report = 0.0
 
     while True:
+        delay = POLL_SECONDS
         try:
-            if monotonic() >= next_report:
-                send_report(collect_host_report(), api_url)
-                next_report = monotonic() + (report_interval or float("inf"))
+            # The cheap call comes first: no collection happens while the API is down.
             answer = api_post(api_url, "/api/agent/poll", identity(), timeout=10)
             if not connected:
                 log(f"Connected to {api_url}. Waiting for orders from the dashboard.")
                 connected = True
+                next_report = 0.0
+            if monotonic() >= next_report:
+                send_report(collect_host_report(), api_url)
+                next_report = monotonic() + (report_interval or float("inf"))
             job = answer.get("job") if answer else None
             if job:
                 log(f"Scanning {job.get('target') or 'this machine'}.")
                 run_job(job, api_url)
         except ApiError as error:
+            delay = IDLE_SECONDS
             if connected is not False:
-                log(f"{error} Retrying.")
+                log(f"{error} Waiting for it to come back.")
                 connected = False
-        wait(POLL_SECONDS)
+        except OSError as error:
+            # A long-running agent must survive a transient failure of a collector.
+            log(f"Collection failed: {error}")
+        wait(delay)

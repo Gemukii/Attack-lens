@@ -6,6 +6,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from attacklens.service import load_agent_config
+
 
 class ApiError(Exception):
     """The API refused a request or could not be reached."""
@@ -17,6 +19,9 @@ def api_post(api_url: str, path: str, payload: dict[str, Any], timeout: float = 
     api_key = os.getenv("ATTACKLENS_API_KEY")
     if api_key:
         headers["X-API-Key"] = api_key
+    token = load_agent_config().get("token")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     request = Request(
         f"{api_url.rstrip('/')}{path}",
         data=json.dumps(payload).encode("utf-8"),

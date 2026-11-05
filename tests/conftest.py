@@ -9,6 +9,13 @@ from attacklens.storage import Store
 from attacklens.web import api
 
 
+@pytest.fixture(autouse=True)
+def isolated_agent_identity(tmp_path, monkeypatch) -> None:
+    """Keep the tests away from the identity of the agent of this machine."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+
+
 @pytest.fixture
 def store(tmp_path) -> Store:
     """Return an empty database."""

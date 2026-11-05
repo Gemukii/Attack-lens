@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Finding, TriageStatus } from '~/types/scan'
+import { LAPSE_LABELS } from '~/utils/findings'
 
 const props = defineProps<{
   finding: Finding | null
@@ -7,10 +8,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  decide: [status: TriageStatus, reason: string]
+  decide: [status: TriageStatus, reason: string, days: number]
 }>()
 
 const reason = ref('')
+const days = ref(90)
 const closeButton = ref<HTMLButtonElement | null>(null)
 
 const isOpen = computed(() => (props.finding?.triage_status ?? 'open') === 'open')
@@ -59,6 +61,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
         <h2 id="drawer-title">{{ finding.title ?? 'Security finding' }}</h2>
         <p class="note">{{ finding.description }}</p>
+        <p v-if="finding.triage_lapsed" class="note">{{ LAPSE_LABELS[finding.triage_lapsed] }}</p>
+
+        <dl v-if="finding.risk" class="facts">
+          <div><dt>Priority</dt><dd>{{ finding.risk.priority }} ({{ finding.risk.score }}/100)</dd></div>
+          <div><dt>Reachability</dt><dd>{{ finding.risk.reachability }}</dd></div>
+          <div><dt>Exploitability</dt><dd>{{ finding.risk.exploitability }}</dd></div>
+        </dl>
 
         <div v-if="finding.risk_reason" class="drawer-block why">
           <span class="eyebrow">Why it matters</span>
@@ -81,17 +90,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <span class="eyebrow">Decision</span>
           <template v-if="isOpen">
             <input v-model="reason" aria-label="Reason for this decision" maxlength="500" placeholder="Reason (optional)" />
+            <label class="duration">
+              <span class="note">Review again in</span>
+              <select v-model.number="days" aria-label="Validity of this decision">
+                <option :value="30">30 days</option>
+                <option :value="90">90 days</option>
+                <option :value="365">1 year</option>
+              </select>
+            </label>
             <div class="drawer-actions">
-              <button class="button small" type="button" @click="emit('decide', 'accepted', reason)">Accept risk</button>
-              <button class="button small" type="button" @click="emit('decide', 'false_positive', reason)">False positive</button>
+              <button class="button small" type="button" @click="emit('decide', 'accepted', reason, days)">Accept risk</button>
+              <button class="button small" type="button" @click="emit('decide', 'false_positive', reason, days)">False positive</button>
             </div>
           </template>
           <template v-else>
             <p>
               {{ finding.triage_status === 'accepted' ? 'Risk accepted' : 'Marked as false positive' }}{{ finding.triage_reason ? `: ${finding.triage_reason}` : '.' }}
+              <template v-if="finding.triage_expires_at">Until {{ formatDate(finding.triage_expires_at) }}.</template>
             </p>
             <div class="drawer-actions">
-              <button class="button small" type="button" @click="emit('decide', 'open', '')">Reopen</button>
+              <button class="button small" type="button" @click="emit('decide', 'open', '', 0)">Reopen</button>
             </div>
           </template>
         </div>

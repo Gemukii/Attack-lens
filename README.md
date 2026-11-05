@@ -1,72 +1,208 @@
 # AttackLens
 
 AttackLens is a self-hosted security scanner for personal machines and servers. It
-shows what your machines expose, tracks what changes over time, and alerts you when
-something new appears.
+shows what your machines expose, explains how findings chain into a real compromise,
+and alerts you when something changes.
 
 > **Status:** Early development
 
 ## How it sees your machines
 
-AttackLens looks at a machine from two sides, because each one misses things:
+AttackLens looks at a machine from three sides, because each one misses things:
 
 | View | Command | Sees | Cannot tell |
 | --- | --- | --- | --- |
-| **Network scan** | `attacklens scan --network` | Common TCP ports reachable from where the scan runs, plus service banners | Which process owns a port, or ports outside the common list |
-| **Host agent** | `attacklens agent` | Every listening TCP socket, its process and bind address, the firewall state, and installed software | Whether another machine can actually reach a socket |
+| **Host agent** | `attacklens agent` | Listening sockets and their processes, firewall, Windows posture, autostart entries, outdated software | What other machines can actually reach |
+| **Network scan** | `Run scan`, or `attacklens scan --network` | Common TCP ports, banners, and active checks | Which process owns a port. On your own address, it also skips your firewall |
+| **External probe** | `attacklens probe`, from another machine | What really gets through the firewall | What listens behind it |
 
-A socket bound to `0.0.0.0` listens on every interface, but the firewall may still
-block it. This is why host reports list findings without an exposure score.
+Combining them gives a verdict for each port: `local`, `shielded` (blocked from
+outside), `exposed` (proved reachable), or `unverified` (no probe covers it yet).
 
 ```text
- attacklens agent          attacklens scan --network      Dashboard "Run scan"
- (on the host)             (CLI)                                 │
-        │                         │                              ▼
-        └──────────┬──────────────┘                     Nuxt dashboard :3000
-                   │                                    server-side proxy,
-                   │ local SQLite, or                   adds the API key
-                   │ POST /api/reports                           │
-                   ▼                                             ▼
-             Change detection ◄──────────────────────────── FastAPI :8000
-             SQLite · alerts · triage
+ Agent (your machine)                 Probe (another machine)
+ outbound calls only                  attacklens probe -> import
+        │  token per machine                  │
+        ▼                                     ▼
+   FastAPI :8000  ◄───── Nuxt proxy :3000 ───── Browser
+   owns SQLite          adds the API key, login
+        │
+        ├─ risk: impact × reachability × exploitability
+        ├─ attack paths and the fix that breaks the most of them
+        └─ alerts, audit log, backups, reports
 ```
 
-When the API runs in Docker, it owns the database and the agent must send its reports
-over HTTP with `--api-url`. SQLite locking is not reliable across a bind mount shared
-between a host and a container.
+## Quick start
 
-## Quick start with Docker
-
-```bash
-docker compose up
-```
-
-Images are rebuilt on each start, so they always match the code.
-
-| Service   |   Port | Description        |
-| --------- | -----: | ------------------ |
-| Dashboard | `3000` | Nuxt web interface |
-| API       | `8000` | FastAPI backend    |
-
-Both are bound to `127.0.0.1`.
-
-Then start the agent on the machine itself, not in a container, and leave it running:
+Once, install the command and set `ATTACKLENS_API_KEY` in `.env` (see
+[Configuration](#configuration)):
 
 ```bash
 python -m venv .venv
-python -m pip install -e .
-attacklens agent --watch --api-url http://127.0.0.1:8000
+.venv/Scripts/python -m pip install -e .
 ```
 
-On Windows, activate the environment first with `.venv\Scripts\Activate.ps1`.
+Then, each time you want to use AttackLens, with Docker Desktop started:
 
-The dashboard shows when the agent is connected. `Run scan` then asks it to scan from
-your machine: it probes the machine's network address, which leaves out the services
-other machines cannot reach, and refreshes the host report. To scan another device
-from your machine, type its address in the target field.
+```bash
+.venv/Scripts/attacklens start
+```
 
-Without the agent, the button becomes `Scan from Docker` and scans
-`host.docker.internal` from the API container, a view that misses part of the machine.
+On Windows, you can also double-click `AttackLens.cmd`.
+
+This opens the dashboard on <http://localhost:3000>. **Press Ctrl+C in that window to
+stop everything.** Nothing runs in the background, and nothing starts by itself.
+
+| Part | Where it runs | Why |
+| --- | --- | --- |
+| API, database | Docker | Isolated from your machine |
+| Dashboard | Docker | Isolated from your machine |
+| Agent | Your machine, in that window | A container cannot see your processes, firewall, or registry |
+
+`Run scan` asks the agent to scan your machine's network address and refresh its report.
+To scan another device, type its address in the target field. There is no continuous
+scan: AttackLens scans when you start it and when you ask.
+
+To see what is running and what AttackLens left on your machine at any time:
+
+```bash
+.venv/Scripts/attacklens status
+```
+
+## Proving what is reachable
+
+Connecting to your own address does not go through your firewall, so a scan from the
+machine itself reports what listens, not what is reachable. The dashboard gives the
+exact command to run from another machine on the same network:
+
+```bash
+attacklens probe 192.168.1.20 --ports 135,445,902 --output probe.json
+```
+
+Copy the file back, and import it on the analyzed machine:
+
+```bash
+attacklens import probe.json
+```
+
+A probe stays valid for 7 days. Ports proved blocked weigh less in the score, and stop
+counting as entry points in attack paths.
+
+## What a result means
+
+Every port probe ends in one of three states: **open**, **closed** (the host refused,
+so it is alive), or **filtered** (nothing answered). If every port is filtered, the
+status is `no_response` and the score is `null`: nothing was observed, which is not a
+clean result.
+
+The score goes from 0 to 100, higher is better. It reflects network exposure, and leaves
+out dismissed findings. Host reports have no score: they list findings.
+
+Each finding also has a **risk**, the product of three factors returned with it:
+
+| Factor | Values |
+| --- | --- |
+| Impact | From the severity |
+| Reachability | `exposed` > `unverified` > `shielded` > `local` |
+| Exploitability | CISA KEV or proved by a check > high EPSS > assumed > proved mitigated |
+
+Findings are sorted by risk. `now` means at least 60 out of 100.
+
+### Active checks
+
+Network scans send one harmless request to these services. They never try a password:
+
+| Port | Check |
+| --- | --- |
+| 445 | SMB signing, read from the negotiation that precedes authentication |
+| 2375 | Docker API answering without authentication |
+| 6379 | Redis answering `PING` without authentication |
+| 9200 | Elasticsearch answering without authentication |
+| 11211 | Memcached answering without authentication |
+| 443, 2376, 5986, 8443 | TLS 1.0 or 1.1 accepted, certificate problems |
+
+### Attack paths
+
+A path chains findings into a compromise: entry, access, privilege, impact. It only
+exists when every link is backed by a finding, and is `confirmed` only with proof. The
+dashboard names the single fix that breaks the most paths.
+
+## Alerts
+
+A new finding creates an alert in the dashboard, and goes to a webhook if one is set.
+The first scan of a target is a baseline. Findings you dismissed do not alert again.
+Alerts only exist while AttackLens is running.
+A new autostart entry always alerts, whatever its severity.
+
+**The API also watches the agents.** While the stack is running, an agent that stops
+calling in for 5 minutes raises an alert, because a monitoring tool that goes quiet looks
+exactly like a healthy machine. Nothing is raised right after the API starts or the
+machine wakes up. With the stack stopped, nothing watches anything: AttackLens is an
+on-demand tool, not a permanent monitor.
+
+## Triage
+
+Open a finding to accept the risk or mark a false positive, with a reason and a review
+date. A decision stops applying when it expires, and as soon as the finding changes: a
+new version or severity is not what you accepted. Findings are identified per machine.
+
+## Security
+
+Agents enroll with a one-time code and receive their own token, stored hashed. A token
+can only report on its own machine, and revoking it takes effect immediately:
+
+```bash
+curl -X DELETE -H "X-API-Key: $ATTACKLENS_API_KEY" http://127.0.0.1:8000/api/agents/<hostname>
+```
+
+Set `ATTACKLENS_DASHBOARD_PASSWORD` to protect the dashboard, which is required before
+it is reachable beyond this machine. Triage decisions, scan orders, enrollments, and
+reports are written to an audit log, shown under `AttackLens runtime`.
+
+AttackLens is intended for systems that you own or are explicitly authorized to assess.
+See [`SECURITY.md`](SECURITY.md).
+
+## Backups and retention
+
+With Docker, the database is backed up daily to `./backups`, on the host, so backups
+survive `docker compose down -v`. The last 14 are kept. Scans older than a year are
+deleted, except the latest of each machine.
+
+To restore, stop the stack and copy a backup over `attacklens.db` in the data volume:
+
+```bash
+docker compose down
+docker compose run --rm -v "$PWD/backups:/restore" --entrypoint cp api /restore/attacklens-YYYYMMDD-HHMMSS.db /app/data/attacklens.db
+docker compose up
+```
+
+## Audit mode
+
+For assessments of systems that are not yours. Record the authorization and its scope,
+then set `ATTACKLENS_AUDIT_MODE=true`: scans are refused unless the **resolved address**
+of the target is inside an active engagement.
+
+```bash
+curl -X POST -H "X-API-Key: $ATTACKLENS_API_KEY" -H "Content-Type: application/json" \
+  -d '{"name":"Acme","authorized_by":"J. Doe","reference":"CONTRACT-12","scope":["192.168.10.0/24"],"starts_at":"2026-11-01T00:00:00Z","ends_at":"2026-11-30T00:00:00Z"}' \
+  http://127.0.0.1:8000/api/engagements
+```
+
+The `Report` button produces a printable report with evidence, attack paths, decisions,
+limits, and a SHA-256 of its content. Scope enforcement does not replace a signed
+authorization: have yours reviewed before any engagement.
+
+## Permanent monitoring (optional)
+
+If you do want the agent to run all the time, for example on a server:
+
+```bash
+attacklens service install
+```
+
+It then starts at each logon and restarts if it crashes, with the rights of your user
+and not as `SYSTEM`. While the stack is stopped it only checks every 30 seconds whether
+the API is back. `attacklens service uninstall` removes it.
 
 ## Running without Docker
 
@@ -79,160 +215,75 @@ uvicorn attacklens.web.api:app --reload
 
 ```bash
 cd frontend
-npm install
+npm install --legacy-peer-deps
 npm run dev
 ```
-
-The CLI, the agent, and the API then share `results/attacklens.db`, so `--api-url` is
-not needed, except for `--watch`.
 
 ## Command line
 
 ```bash
-attacklens scan --network                  # scan 127.0.0.1
 attacklens scan --network --host 192.168.1.10
-attacklens scan --network --json           # full result document
 attacklens scan --network --fail-on high   # exit 1 on a high or critical finding
-attacklens agent                           # inspect this machine once
-attacklens agent --watch --api-url URL     # take scan orders from the dashboard
+attacklens start                           # everything, in this window
+attacklens status                          # what runs, what starts by itself
+attacklens stop                            # stop the containers
+attacklens agent --json                    # inspect this machine once
+attacklens probe HOST --output probe.json  # from another machine
+attacklens import probe.json
+attacklens enroll CODE
+attacklens service install|uninstall|status
+attacklens backup copy.db                  # local database
 ```
 
-| Exit code | Meaning |
-| --------: | --- |
-| `0` | Completed |
-| `1` | A finding reached the `--fail-on` severity |
-| `2` | Nothing was observed: unknown host, no port answered, or the API was unreachable |
-
-## What a result means
-
-Every port probe ends in one of three states:
-
-* **open**: the port accepted the connection.
-* **closed**: the host refused it, which proves the host is alive.
-* **filtered**: nothing answered.
-
-If every port is filtered, the scan status is `no_response` and the score is `null`:
-the target is down or fully filtered, and nothing was observed. This is not a clean
-result.
-
-The score goes from 0 to 100, higher is better. It only reflects the network exposure
-of a scan, and leaves out findings marked as accepted or false positive. The score at
-scan time stays available as `raw_score`.
-
-Probes wait 3 seconds, in parallel. Windows takes about 2 seconds to refuse a
-connection, so a shorter timeout reports closed ports as filtered.
-
-## Alerts and scheduled runs
-
-Each new scan is compared with the last complete scan of the same target. A new
-finding creates an alert in the dashboard, and is sent to a webhook if one is set.
-The first scan of a target is a baseline and raises no alert. Findings you dismissed
-do not alert again.
-
-For regular reports, add `--interval 3600` to `--watch`, or schedule single runs with
-the tools of your system. The API key, if any, is read from `ATTACKLENS_API_KEY`.
-
-On Windows, from an elevated prompt or for your own user:
-
-```powershell
-schtasks /Create /SC HOURLY /TN "AttackLens agent" /TR "C:\path\to\.venv\Scripts\attacklens.exe agent --api-url http://127.0.0.1:8000"
-```
-
-On Linux, with cron:
-
-```text
-0 * * * * /path/to/.venv/bin/attacklens agent --api-url http://127.0.0.1:8000
-```
-
-## Triage
-
-Open a finding in the dashboard to accept the risk or mark a false positive, with an
-optional reason. It stays visible but stops counting in the score and in alerts. Use
-`Reopen` to reverse the decision. Findings are identified per target, so a decision
-on one machine does not affect another.
+Exit codes: `0` completed, `1` a finding reached `--fail-on`, `2` nothing was observed.
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ATTACKLENS_API_KEY` | empty | Protects the API with the `X-API-Key` header. An empty value means no key. |
-| `ATTACKLENS_API_URL` | empty | Default for `--api-url`. |
+| `ATTACKLENS_API_KEY` | empty | Protects the API. An empty value leaves it open. |
+| `ATTACKLENS_DASHBOARD_PASSWORD` | empty | Protects the dashboard. |
 | `ATTACKLENS_ALLOWED_TARGETS` | empty | Comma-separated allowlist of scan targets. |
 | `ATTACKLENS_ALLOWED_HOSTS` | `localhost,127.0.0.1,api` | Host headers accepted by the API. |
-| `ATTACKLENS_CORS_ORIGINS` | `http://localhost:3000` | Allowed browser origins for direct API calls. |
-| `ATTACKLENS_DEFAULT_TARGET` | `127.0.0.1` | Target of a scan without an explicit one. |
-| `ATTACKLENS_DB_PATH` | `results/attacklens.db` | Database location. |
-| `ATTACKLENS_RESULTS_DIR` | `results` | Location of JSON results from earlier versions. |
-| `ATTACKLENS_ENABLE_OSV` | `false` | Sends package names and versions to [OSV](https://osv.dev). |
+| `ATTACKLENS_CORS_ORIGINS` | `http://localhost:3000` | Browser origins for direct API calls. |
+| `ATTACKLENS_DEFAULT_TARGET` | `127.0.0.1` | Target of a scan run from the API. |
+| `ATTACKLENS_ENABLE_OSV` | `false` | Sends package names to [OSV](https://osv.dev), and CVE identifiers to [EPSS](https://www.first.org/epss/). |
 | `ATTACKLENS_ALERT_WEBHOOK_URL` | empty | Discord or Slack webhook. |
 | `ATTACKLENS_ALERT_MIN_SEVERITY` | `low` | Lowest severity that raises an alert. |
-
-The dashboard reads `NUXT_API_INTERNAL_BASE`, `NUXT_API_KEY`, `NUXT_ALLOWED_HOSTS`, and
-`NUXT_PUBLIC_SCAN_TARGET`. Docker Compose sets them for you.
-
-JSON results from earlier versions are imported automatically when the database is
-created. The JSON files are left untouched.
-
-## API
-
-```text
-GET  /api/health
-POST /api/scan                       run a network scan: {"target": "127.0.0.1"}
-POST /api/reports                    store a scan produced by the CLI or the agent
-GET  /api/results                    latest network scan
-GET  /api/host                       latest host report (?target=)
-GET  /api/scans                      history (?limit= &scan_type= &target=)
-GET  /api/scans/compare              ?before_id= &after_id=, for the same target
-PUT  /api/findings/{id}/triage       {"status": "accepted", "reason": "..."}
-GET  /api/alerts
-GET  /api/agents                     known host agents and whether they are online
-POST /api/jobs                       ask the agent to scan: {"target": null} for itself
-GET  /api/jobs/{id}                  state of a scan order
-POST /api/agent/poll                 heartbeat of an agent, returns its next order
-POST /api/agent/jobs/{id}/result     outcome of an order
-GET  /api/inventory                  the environment running the API
-GET  /api/vulnerabilities            Python packages of the API, when OSV is enabled
-GET  /api/posture                    configuration of the API runtime
-```
-
-The last three describe the runtime of the API. In Docker, that is the AttackLens
-container and not your machine: use the agent to inspect the host.
+| `ATTACKLENS_AGENT_SILENCE_SECONDS` | `300` | Quiet time before an agent is reported. |
+| `ATTACKLENS_RETENTION_DAYS` | `365` | Age of the scans to delete. |
+| `ATTACKLENS_BACKUP_DIR` | empty | Enables daily backups. Set by Docker Compose. |
+| `ATTACKLENS_AUDIT_MODE` | `false` | Enforces the scope of engagements. |
+| `ATTACKLENS_DB_PATH` | `results/attacklens.db` | Database location. |
+| `ATTACKLENS_API_URL` | empty | Default for `--api-url`. |
 
 ## Known limits
 
+* An external probe has to be run by hand from another machine.
 * The network scan covers 36 common TCP ports. There is no UDP.
-* The agent only lists TCP listeners.
-* Vulnerability lookups need Debian or Ubuntu LTS. OSV has no index of Windows
-  software, so Windows programs are inventoried but not checked.
-* Without elevated rights, Linux firewall rules are usually unreadable and reported
-  as `unknown`.
-* Inside and outside views are not correlated yet: nothing confirms automatically
-  whether a listener is reachable from another machine.
+* OSV has no index of Windows software, so Windows programs are compared with `winget`,
+  which reports available updates and not known vulnerabilities.
+* The Windows posture needs no elevation. Without it, some controls stay `unknown`.
+* The posture checks are Windows only. Linux gets listeners, packages, and vulnerabilities.
+* The agent runs as your user: it cannot detect an intruder who already controls that
+  account, beyond the silence alert.
+* The session of the dashboard is limited to a single shared password.
+* The database is not encrypted at rest. Use disk encryption on the host.
 
-## Testing
+## Development
 
 ```bash
 pytest
 ruff check src tests
+cd frontend && npm test
 ```
 
-## Security
+Python versions are locked with hashes in `requirements.lock`, which the Docker image
+installs. After changing dependencies, regenerate it on Linux with Python 3.12:
 
-AttackLens is intended for systems that you own or are explicitly authorized to assess.
-Do not use the scanner against systems without permission.
-
-See [`SECURITY.md`](SECURITY.md) for the data handling policy and vulnerability
-reporting.
-
-## Roadmap
-
-* Correlation of the inside and outside views, with a remote probe
-* Nmap and Trivy integration
-* TLS inspection
-* Docker security checks: privileged containers, published ports
-* Active checks, such as Redis without authentication
-* CISA KEV and EPSS prioritization
-* Audit mode: engagements, enforced scope, and reports
+```bash
+pip-compile --generate-hashes --strip-extras --no-header --no-annotate --allow-unsafe -o requirements.lock pyproject.toml
+```
 
 ## License
 

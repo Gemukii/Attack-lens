@@ -1,4 +1,4 @@
-import type { Agent, Alert, HostInventory, HostReport, PostureReport, ScanComparison, ScanHistory, ScanJob, ScanRequest, ScanResults, TriageStatus, VulnerabilityReport } from '~/types/scan'
+import type { Agent, Alert, AttackPathReport, AuditEntry, ExposureReport, HostInventory, HostReport, PostureReport, ScanComparison, ScanHistory, ScanJob, ScanRequest, ScanResults, TriageStatus, VulnerabilityReport } from '~/types/scan'
 
 // Calls stay on the dashboard origin: server/api/[...path].ts forwards them to the API.
 export const createScanApi = () => ({
@@ -9,6 +9,10 @@ export const createScanApi = () => ({
   getHostReport: () => $fetch<HostReport>('/api/host'),
   getAlerts: () => $fetch<Alert[]>('/api/alerts'),
   getAgents: () => $fetch<Agent[]>('/api/agents'),
+  getPaths: () => $fetch<AttackPathReport>('/api/paths'),
+  getExposure: () => $fetch<ExposureReport>('/api/exposure'),
+  getAudit: () => $fetch<AuditEntry[]>('/api/audit', { query: { limit: 12 } }),
+  createEnrollmentCode: () => $fetch<{ code: string; expires_at: string }>('/api/agents/enrollment', { method: 'POST' }),
   getInventory: () => $fetch<HostInventory>('/api/inventory'),
   getVulnerabilities: () => $fetch<VulnerabilityReport>('/api/vulnerabilities'),
   getPosture: () => $fetch<PostureReport>('/api/posture'),
@@ -24,8 +28,8 @@ export const createScanApi = () => ({
     body: { target },
   }),
   getJob: (jobId: string) => $fetch<ScanJob>(`/api/jobs/${jobId}`),
-  setTriage: (findingId: string, status: TriageStatus, reason?: string) => $fetch(`/api/findings/${findingId}/triage`, {
+  setTriage: (findingId: string, status: TriageStatus, reason?: string, days?: number) => $fetch(`/api/findings/${findingId}/triage`, {
     method: 'PUT',
-    body: { status, reason: reason || null },
+    body: { status, reason: reason || null, days: days ?? null },
   }),
 })

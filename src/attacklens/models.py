@@ -47,8 +47,11 @@ class Finding:
     banner: str | None = None
     process: str | None = None
     exposure: str | None = None
+    verification: str | None = None
     cve: str | None = None
     cvss: float | None = None
+    known_exploited: bool | None = None
+    epss: float | None = None
 
     def stable_id(self) -> str:
         """Return an identity that survives changes to volatile evidence."""

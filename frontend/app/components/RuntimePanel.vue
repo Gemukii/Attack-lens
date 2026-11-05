@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { HostInventory, PostureReport, VulnerabilityReport } from '~/types/scan'
+import type { AuditEntry, HostInventory, PostureReport, VulnerabilityReport } from '~/types/scan'
 
 defineProps<{
   inventory: HostInventory | null
   vulnerabilities: VulnerabilityReport | null
   posture: PostureReport | null
+  audit: AuditEntry[]
 }>()
 </script>
 
@@ -33,6 +34,14 @@ defineProps<{
         <div v-for="check in posture.checks" :key="check.id" class="check">
           <span>{{ check.status.replace('_', ' ') }} · {{ check.title }}</span>
           <p>{{ check.description }}</p>
+        </div>
+      </section>
+
+      <section v-if="audit.length">
+        <h3 class="eyebrow">Audit log</h3>
+        <div v-for="entry in audit" :key="entry.entry_id" class="check">
+          <span>{{ entry.action.replaceAll('_', ' ') }} · {{ entry.actor }}</span>
+          <p>{{ formatDate(entry.at) }}{{ entry.detail ? ` · ${entry.detail}` : '' }}</p>
         </div>
       </section>
 

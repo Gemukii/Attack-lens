@@ -9,6 +9,38 @@ export interface Agent {
   address: string
   last_seen: string
   online: boolean
+  silent_since?: string | null
+}
+
+export interface AttackPathReport {
+  paths: Array<{
+    id: string
+    title: string
+    severity: string
+    certainty: 'confirmed' | 'potential'
+    steps: Array<{ stage: string; label: string; finding_id: string | null }>
+  }>
+  best_cut: {
+    finding_id: string
+    title: string
+    remediation: string
+    paths_broken: number
+  } | null
+}
+
+export interface ExposureReport {
+  status: 'verified' | 'unverified' | 'no_host_report'
+  summary: { exposed?: number; shielded?: number; unverified?: number; local?: number }
+  probe: { target: string; completed_at?: string; status?: string } | null
+  probe_command?: string
+}
+
+export interface AuditEntry {
+  entry_id: number
+  at: string
+  actor: string
+  action: string
+  detail: string | null
 }
 
 export interface ScanJob {
@@ -42,6 +74,19 @@ export interface Finding {
   exposure?: 'loopback' | 'interface' | 'all' | null
   triage_status?: TriageStatus
   triage_reason?: string | null
+  triage_expires_at?: string | null
+  triage_lapsed?: 'expired' | 'changed' | null
+  reachability?: 'exposed' | 'shielded' | 'local' | 'unverified'
+  verification?: 'confirmed' | 'mitigated' | null
+  known_exploited?: boolean | null
+  epss?: number | null
+  risk?: {
+    score: number
+    priority: 'now' | 'soon' | 'later'
+    impact: number
+    reachability: string
+    exploitability: string
+  }
 }
 
 export interface ScanService {
@@ -76,6 +121,8 @@ export interface ScanResults {
 }
 
 export interface HostReport extends ScanResults {
+  autorun_count?: number
+  outdated_count?: number
   os: {
     system: string
     release: string

@@ -13,11 +13,12 @@ export default defineNuxtConfig({
   ],
 
   // Overridden at runtime by NUXT_API_INTERNAL_BASE, NUXT_API_KEY, NUXT_ALLOWED_HOSTS,
-  // and NUXT_PUBLIC_SCAN_TARGET. Only the `public` section reaches the browser.
+  // NUXT_DASHBOARD_PASSWORD, and NUXT_PUBLIC_SCAN_TARGET. Only the `public` section reaches the browser.
   runtimeConfig: {
     apiInternalBase: 'http://127.0.0.1:8000',
     apiKey: '',
     allowedHosts: 'localhost,127.0.0.1',
+    dashboardPassword: '',
 
     public: {
       scanTarget: '127.0.0.1',

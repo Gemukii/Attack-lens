@@ -1,5 +1,7 @@
 """Scan result documents for AttackLens."""
 
+import hashlib
+import json
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
@@ -8,6 +10,8 @@ from uuid import uuid4
 from attacklens.models import Finding
 
 SEVERITY_WEIGHTS = {"critical": 35, "high": 20, "medium": 10, "low": 4}
+# A service proved unreachable from outside weighs less than one nobody has tested.
+REACHABILITY_WEIGHTS = {"exposed": 1.0, "unverified": 1.0, "shielded": 0.25, "local": 0.1}
 SEVERITY_ORDER = ("info", "low", "medium", "high", "critical")
 ACTIVE_TRIAGE_STATUS = "open"
 
@@ -94,27 +98,64 @@ def network_document(
     )
 
 
+def finding_fingerprint(finding: dict[str, Any]) -> str:
+    """Summarize what a triage decision was based on."""
+    values = [finding.get(key) for key in ("severity", "version", "exposure", "service")]
+    return hashlib.sha256(json.dumps(values).encode()).hexdigest()[:16]
+
+
+def active_decision(
+    finding: dict[str, Any], decision: dict[str, Any] | None
+) -> tuple[dict[str, Any], str | None]:
+    """Return the decision still in force, and why it lapsed if it did.
+
+    Accepting a risk is a judgment about a situation at a point in time: it stops
+    applying when it expires, or as soon as the finding is not what was accepted.
+    """
+    if not decision:
+        return {}, None
+    expires_at = decision.get("expires_at")
+    if expires_at and expires_at <= datetime.now(UTC).isoformat():
+        return {}, "expired"
+    fingerprint = decision.get("fingerprint")
+    if fingerprint and fingerprint != finding_fingerprint(finding):
+        return {}, "changed"
+    return decision, None
+
+
+def probe_document(scan: Any, target: str, duration_seconds: float) -> dict[str, Any]:
+    """Build the document of a scan run from another machine."""
+    return {
+        **network_document(scan, target, duration_seconds, vantage="external"),
+        "scan_type": "probe",
+    }
+
+
 def apply_triage(document: dict[str, Any], statuses: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Return a copy of a scan with triage decisions and an updated score."""
     findings = []
     for finding in document.get("findings", []):
-        decision = statuses.get(finding.get("finding_id", ""), {})
+        decision, lapsed = active_decision(finding, statuses.get(finding.get("finding_id", "")))
         findings.append(
             {
                 **finding,
                 "triage_status": decision.get("status", ACTIVE_TRIAGE_STATUS),
                 "triage_reason": decision.get("reason"),
+                "triage_expires_at": decision.get("expires_at"),
+                "triage_lapsed": lapsed,
             }
         )
 
     triaged = {**document, "findings": findings}
     if document.get("score") is not None:
         triaged["raw_score"] = document["score"]
-        triaged["score"] = score_from_severities(
-            finding.get("severity") or ""
+        penalty = sum(
+            SEVERITY_WEIGHTS.get((finding.get("severity") or "").lower(), 0)
+            * REACHABILITY_WEIGHTS.get(finding.get("reachability"), 1.0)
             for finding in findings
             if finding["triage_status"] == ACTIVE_TRIAGE_STATUS
         )
+        triaged["score"] = max(0, min(100, round(100 - penalty)))
     return triaged
 
 

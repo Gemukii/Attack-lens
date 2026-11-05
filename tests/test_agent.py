@@ -22,7 +22,10 @@ class StopWatching(Exception):
 
 @pytest.fixture
 def online_agent(client) -> None:
-    """Register a live agent."""
+    """Enroll a live agent: the client then speaks as this agent."""
+    code = client.post("/api/agents/enrollment").json()["code"]
+    token = client.post("/api/agents/enroll", json={"code": code, "hostname": "pc"}).json()["token"]
+    client.headers["Authorization"] = f"Bearer {token}"
     client.post("/api/agent/poll", json=POLL)
 
 
@@ -106,7 +109,7 @@ def test_failure_is_reported(client, online_agent) -> None:
     assert job["error"] == "Unable to resolve"
 
 
-def test_result_for_an_unknown_job_is_refused(client) -> None:
+def test_result_for_an_unknown_job_is_refused(client, online_agent) -> None:
     """Results only apply to running orders."""
     response = client.post("/api/agent/jobs/nope/result", json={"status": "done"})
 
@@ -318,4 +321,52 @@ def test_watch_survives_an_api_outage(monkeypatch) -> None:
     with pytest.raises(StopWatching):
         watch("http://api", log=messages.append, wait=_stop_after(3))
 
-    assert messages == ["down. Retrying.", "Connected to http://api. Waiting for orders from the dashboard."]
+    assert messages == [
+        "down. Waiting for it to come back.",
+        "Connected to http://api. Waiting for orders from the dashboard.",
+    ]
+
+
+def test_watch_does_nothing_while_the_api_is_down(monkeypatch) -> None:
+    """Without Docker the agent must sleep: no collection, and rare connection attempts."""
+    delays = []
+
+    def post(url, path, payload, timeout=30):
+        raise ApiError("down.")
+
+    def forbidden():
+        raise AssertionError("nothing to collect while the API is down")
+
+    def wait(seconds: float) -> None:
+        delays.append(seconds)
+        if len(delays) >= 5:
+            raise StopWatching
+
+    monkeypatch.setattr(agent, "collect_host_report", forbidden)
+    monkeypatch.setattr(agent, "api_post", post)
+
+    with pytest.raises(StopWatching):
+        watch("http://api", log=lambda message: None, wait=wait)
+
+    assert delays == [agent.IDLE_SECONDS] * 5
+
+
+def test_watch_sends_a_fresh_report_each_time_the_api_comes_back(monkeypatch) -> None:
+    """Starting Docker gives an up-to-date view, once, without any continuous scan."""
+    reports = []
+    answers = iter([{"job": None}, {"job": None}, ApiError("down."), {"job": None}, {"job": None}])
+
+    def post(url, path, payload, timeout=30):
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(agent, "collect_host_report", lambda: {"scan_type": "host"})
+    monkeypatch.setattr(agent, "send_report", lambda document, url: reports.append(document))
+    monkeypatch.setattr(agent, "api_post", post)
+
+    with pytest.raises(StopWatching):
+        watch("http://api", log=lambda message: None, wait=_stop_after(5))
+
+    assert len(reports) == 2

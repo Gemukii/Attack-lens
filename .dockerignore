@@ -4,6 +4,7 @@
 __pycache__
 *.pyc
 results
+backups
 .env
 .env.*
 README.md

@@ -29,6 +29,10 @@ services:
       ATTACKLENS_ENABLE_OSV: ${ATTACKLENS_ENABLE_OSV:-false}
       ATTACKLENS_ALERT_WEBHOOK_URL: ${ATTACKLENS_ALERT_WEBHOOK_URL:-}
       ATTACKLENS_ALERT_MIN_SEVERITY: ${ATTACKLENS_ALERT_MIN_SEVERITY:-low}
+      ATTACKLENS_AGENT_SILENCE_SECONDS: ${ATTACKLENS_AGENT_SILENCE_SECONDS:-300}
+      ATTACKLENS_RETENTION_DAYS: ${ATTACKLENS_RETENTION_DAYS:-365}
+      ATTACKLENS_AUDIT_MODE: ${ATTACKLENS_AUDIT_MODE:-false}
+      ATTACKLENS_BACKUP_DIR: /app/backups
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -36,6 +40,8 @@ services:
       - attacklens-data:/app/data
       # Only read once, to import JSON results written by earlier versions.
       - ./results:/app/results:ro
+      # On the host, so that backups survive `docker compose down -v`.
+      - ./backups:/app/backups
     healthcheck:
       test:
         - CMD
@@ -67,6 +73,7 @@ services:
     environment:
       NUXT_API_INTERNAL_BASE: http://api:8000
       NUXT_API_KEY: ${ATTACKLENS_API_KEY:-}
+      NUXT_DASHBOARD_PASSWORD: ${ATTACKLENS_DASHBOARD_PASSWORD:-}
       NUXT_PUBLIC_SCAN_TARGET: ${ATTACKLENS_DEFAULT_TARGET:-host.docker.internal}
     depends_on:
       api:

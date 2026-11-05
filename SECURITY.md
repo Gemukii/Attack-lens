@@ -54,7 +54,8 @@ No collected security information should be transmitted externally by default.
 
 Two features send data to third parties. Both are disabled until you configure them:
 
-* `ATTACKLENS_ENABLE_OSV` sends package names and versions to the public OSV database.
+* `ATTACKLENS_ENABLE_OSV` sends package names and versions to the public OSV database,
+  CVE identifiers to EPSS, and downloads the CISA KEV catalog.
 * `ATTACKLENS_ALERT_WEBHOOK_URL` sends the target name and finding titles to your webhook.
 
 Network scans read service banners over TLS without validating certificates, because
@@ -66,8 +67,29 @@ only send an anonymous `HEAD` request, and their answer is only displayed as a b
 The agent only makes outbound calls to the API, so nothing has to reach into the host.
 It accepts a single kind of order, a network scan. It never executes a command received
 from the API, and validates scan targets itself. `ATTACKLENS_ALLOWED_TARGETS` restricts
-the targets the dashboard can send it. Whoever can reach the API can order scans from
-your machine, so set `ATTACKLENS_API_KEY` when the API is reachable beyond localhost.
+the targets the dashboard can send it.
+
+Each agent has its own token, obtained with a one-time code that expires after 15
+minutes. Tokens and codes are stored hashed. The name of an agent comes from its token,
+never from its requests, and an agent can only report on itself: a compromised agent
+cannot declare another enrolled machine clean. Set `ATTACKLENS_API_KEY`, otherwise
+whoever reaches the API can create enrollment codes.
+
+Agents run with the rights of the user, never as `SYSTEM` or root. The agent drops the
+arguments of autostart entries, which can hold secrets, and keeps only the program path.
+
+## Active checks
+
+Network scans send one harmless request to a few services, listed in the README. They
+never attempt authentication, never send a payload, and change nothing on the target.
+They are still traffic: only scan systems you own or are authorized to assess.
+
+## Audit trail
+
+Scan orders, triage decisions, enrollments, revocations, refused reports, and generated
+reports are recorded with their actor. Accepted risks expire, and reopen when the
+finding changes. In audit mode, scans outside the scope of an active engagement are
+refused, based on the resolved address of the target.
 
 ## Privilege model
 
