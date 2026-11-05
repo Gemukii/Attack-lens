@@ -18,7 +18,7 @@ RUN apt-get update \
 
 RUN addgroup --gid 10001 attacklens \
 	&& adduser --uid 10001 --gid 10001 --home /app --no-create-home --disabled-login --gecos "" attacklens \
-	&& mkdir -p /app/results \
+	&& mkdir -p /app/data /app/results \
 	&& chown -R attacklens:attacklens /app
 
 USER attacklens

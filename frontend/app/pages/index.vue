@@ -1,724 +1,248 @@
-```vue
 <script setup lang="ts">
-import type { Finding } from '~/types/scan'
+import type { Finding, TriageStatus } from '~/types/scan'
 import { useScan } from '~/composables/useScan'
 
-const { results: scan, history, comparison, inventory, vulnerabilities, posture, status, error, loadResults, loadHistory, loadInventory, loadVulnerabilities, loadPosture, compareScans, runScan } = useScan()
+const { results: scan, history, comparison, inventory, vulnerabilities, posture, hostReport, alerts, agent, status, error, loadAll, loadAgents, compareScans, runScan, setTriage } = useScan()
 const config = useRuntimeConfig()
-const target = ref(String(config.public.scanTarget || 'host.docker.internal'))
-const showAllFindings = ref(false)
-const selectedFinding = ref<Finding | null>(null)
-const comparisonTarget = ref('')
+const dockerTarget = String(config.public.scanTarget)
 
-onMounted(() => Promise.all([loadResults(), loadHistory(), loadInventory(), loadVulnerabilities(), loadPosture()]))
+const target = ref('')
+const selectedFinding = ref<Finding | null>(null)
+const copied = ref(false)
+const scanning = computed(() => status.value === 'running')
+const AGENT_COMMAND = 'attacklens agent --watch --api-url http://127.0.0.1:8000'
+
+let agentTimer: ReturnType<typeof setInterval> | undefined
+
+onMounted(() => {
+  loadAll()
+  agentTimer = setInterval(loadAgents, 4000)
+})
+onBeforeUnmount(() => clearInterval(agentTimer))
 
 const findings = computed<Finding[]>(() => scan.value?.findings ?? [])
+const isOpen = (finding: Finding) => (finding.triage_status ?? 'open') === 'open'
+const openFindings = computed(() => findings.value.filter(isOpen))
+const noResponse = computed(() => scan.value?.status === 'no_response')
+const score = computed(() => scan.value?.score ?? null)
+const animatedScore = useAnimatedNumber(score)
 
-const criticalCount = computed(() =>
-  findings.value.filter(
-    (finding) => finding.severity?.toLowerCase() === 'critical',
-  ).length,
+const severityCount = (severity: string) =>
+  openFindings.value.filter((finding) => finding.severity?.toLowerCase() === severity).length
+
+const tally = computed(() =>
+  ['critical', 'high', 'medium', 'low'].map((severity) => ({ severity, count: severityCount(severity) })),
 )
 
-const highCount = computed(() =>
-  findings.value.filter(
-    (finding) => finding.severity?.toLowerCase() === 'high',
-  ).length,
-)
-
-const mediumCount = computed(() =>
-  findings.value.filter(
-    (finding) => finding.severity?.toLowerCase() === 'medium',
-  ).length,
-)
-
-const lowCount = computed(() =>
-  findings.value.filter(
-    (finding) => finding.severity?.toLowerCase() === 'low',
-  ).length,
-)
-
-const openPorts = computed(() => {
-  return scan.value?.open_ports?.length ?? 0
-})
-
-const score = computed(() => {
-  return scan.value?.score ?? 0
-})
-
-const scoreLabel = computed(() => {
-  if (!scan.value) return 'No scan yet'
-  if (score.value >= 80) return 'Good'
-  if (score.value >= 60) return 'Warning'
+const verdict = computed(() => {
+  if (!scan.value) return 'No reading'
+  if (noResponse.value) return 'No response'
+  if (score.value === null) return 'Not scored'
+  if (score.value >= 80) return 'Contained'
+  if (score.value >= 60) return 'Watch'
   return 'At risk'
 })
 
-const scoreClass = computed(() => {
-  if (score.value >= 80) return 'good'
-  if (score.value >= 60) return 'warning'
-  return 'danger'
+const verdictAlarm = computed(() => score.value !== null && score.value < 60)
+
+const summary = computed(() => {
+  if (!scan.value) return 'No exposure reading yet. Run a scan to take the first one.'
+  if (noResponse.value) return 'No port answered. The target is down or fully filtered, so nothing was observed. This is not a clean result.'
+  const coverage = scan.value.coverage
+  const opened = coverage?.ports_open ?? scan.value.open_ports?.length ?? 0
+  const urgent = severityCount('critical') + severityCount('high')
+  const reading = coverage?.ports_checked
+    ? `${opened} of ${coverage.ports_checked} common ports accepted a connection.`
+    : `${opened} ports accepted a connection.`
+  const priority = urgent ? ` ${urgent} need${urgent === 1 ? 's' : ''} attention first.` : ''
+  const dismissed = findings.value.length - openFindings.value.length
+  const excluded = dismissed ? ` ${dismissed} dismissed, not counted.` : ''
+  return `${reading}${priority}${excluded}`
 })
 
-const scoreRingStyle = computed(() => ({
-  '--score-angle': `${score.value * 3.6}deg`,
-}))
-
-const topFindings = computed(() => {
-  const severityOrder: Record<string, number> = {
-    critical: 0,
-    high: 1,
-    medium: 2,
-    low: 3,
-  }
-
-  return [...findings.value]
-    .sort(
-      (a, b) =>
-        (severityOrder[a.severity?.toLowerCase() ?? 'low'] ?? 4) -
-        (severityOrder[b.severity?.toLowerCase() ?? 'low'] ?? 4),
-    )
-    .slice(0, showAllFindings.value ? undefined : 5)
+const vantage = computed(() => {
+  const value = scan.value?.vantage
+  if (value === 'host') return 'Scanned from the machine itself'
+  if (value === 'container') return 'Scanned from the Docker container'
+  return value ? `Scanned from ${value}` : 'Scan origin not recorded'
 })
 
-const lastScan = computed(() => scan.value?.completed_at ?? null)
-
-const formattedDate = computed(() => {
-  if (!lastScan.value) {
-    return 'No scan completed'
-  }
-
-  const date = new Date(lastScan.value)
-
-  if (Number.isNaN(date.getTime())) {
-    return String(lastScan.value)
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
+const emptyTitle = computed(() => {
+  if (!scan.value) return 'No scan yet'
+  return noResponse.value ? `No response from ${scan.value.target}` : 'Nothing exposed'
 })
 
-const formattedDuration = computed(() => {
-  if (scan.value?.duration_seconds === undefined) {
-    return '—'
-  }
-
-  return `${scan.value.duration_seconds.toFixed(1)}s`
+const emptyText = computed(() => {
+  if (!scan.value) return 'Run a scan to take the first reading.'
+  if (noResponse.value) return 'The target is down or fully filtered.'
+  return openFindings.value.length === findings.value.length
+    ? 'None of the common ports accepted a connection.'
+    : 'Every finding has been dismissed.'
 })
 
-const formatBytes = (bytes?: number) => {
-  if (bytes === undefined) return '—'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit += 1
-  }
-  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`
-}
-const refreshScan = () => Promise.all([loadResults(), loadHistory(), loadInventory(), loadVulnerabilities(), loadPosture()])
+const firewallWeak = computed(() => ['disabled', 'partial'].includes(hostReport.value?.firewall.status ?? ''))
+const listenersBeyondLoopback = computed(() =>
+  hostReport.value?.listeners.items.filter((listener) => listener.exposure !== 'loopback').length ?? 0,
+)
 
-const compareWithSelectedScan = () => {
-  if (comparisonTarget.value && scan.value?.scan_id) {
-    return compareScans(comparisonTarget.value, scan.value.scan_id)
-  }
-}
-const scanStatusLabel = computed(() => ({
-  idle: 'Ready',
-  loading: 'Loading results',
-  running: 'Scanning...',
-  completed: 'Completed',
-  failed: 'Failed',
-}[status.value]))
+const vulnerabilityLabel = computed(() => {
+  const report = hostReport.value?.vulnerabilities
+  if (!report) return '—'
+  return {
+    complete: `${report.advisories_found} advisories`,
+    partial: `${report.advisories_found} advisories`,
+    unavailable: 'Unavailable',
+    disabled: 'Lookup off',
+    not_covered: 'Not covered',
+  }[report.status]
+})
 
-const startScan = async () => {
-  await runScan(target.value.trim() || String(config.public.scanTarget || 'host.docker.internal'))
+const scanLabel = computed(() => {
+  if (scanning.value) return 'Scanning…'
+  return agent.value ? 'Run scan' : 'Scan from Docker'
+})
+
+const startScan = () => runScan(target.value.trim(), dockerTarget)
+
+const decide = async (decision: TriageStatus, reason: string) => {
+  if (!selectedFinding.value?.finding_id) return
+  await setTriage(selectedFinding.value.finding_id, decision, reason)
+  selectedFinding.value = null
 }
 
+const compareWith = (scanId: string) => {
+  if (scan.value?.scan_id) return compareScans(scanId, scan.value.scan_id)
+}
+
+const copyCommand = async () => {
+  await navigator.clipboard.writeText(AGENT_COMMAND)
+  copied.value = true
+  setTimeout(() => (copied.value = false), 1600)
+}
 </script>
 
 <template>
-  <main class="dashboard">
-    <header class="topbar">
+  <div :class="['room', { scanning }]">
+    <header class="bar">
       <div class="brand">
-        <div class="brand-mark">
-          <span />
-          <span />
-          <span />
-        </div>
-
-        <div>
-          <h1>AttackLens</h1>
-          <p>Security overview</p>
-        </div>
+        <svg viewBox="-12 -12 24 24" aria-hidden="true">
+          <circle r="11" fill="none" stroke="var(--paper)" stroke-width="1.5" />
+          <polygon points="0,-5 4.8,-1.5 3,4 -3,4 -4.8,-1.5" fill="var(--safelight)" />
+        </svg>
+        AttackLens
       </div>
 
-      <div class="topbar-actions">
-        <div class="scan-status">
-          <span :class="['status-dot', { running: status === 'running' } ]" />
-          <span>{{ scanStatusLabel }}</span>
-        </div>
-
-        <button class="refresh-button" type="button" @click="refreshScan">
-          <span>↻</span>
-          Refresh
-        </button>
-
-        <button
-          class="run-button"
-          type="button"
-          :disabled="status === 'running'"
-          @click="startScan"
-        >
-          {{ status === 'running' ? 'Scanning...' : 'Run scan' }}
-        </button>
+      <div class="agent-state" role="status">
+        <span :class="['agent-dot', { online: agent }]" />
+        <span>{{ agent ? `Agent connected · ${agent.hostname}` : 'Agent offline' }}</span>
       </div>
+
+      <form class="controls" @submit.prevent="startScan">
+        <label class="target-field">
+          <span class="eyebrow">Target</span>
+          <input
+            v-model="target"
+            :disabled="scanning"
+            :placeholder="agent ? 'this machine' : dockerTarget"
+            aria-label="Scan target"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+        <button class="button" type="button" :disabled="scanning" @click="loadAll">Refresh</button>
+        <button class="button primary" type="submit" :disabled="scanning">{{ scanLabel }}</button>
+      </form>
     </header>
 
-    <section class="hero">
-      <div>
-        <p class="eyebrow">SECURITY OVERVIEW</p>
-        <h2>Your security at a glance.</h2>
-        <p class="hero-description">
-          Monitor vulnerabilities, exposed services and the overall security
-          posture of your target.
-        </p>
-      </div>
-
-      <div class="target-card">
-        <span class="target-label">TARGET</span>
-        <input v-model="target" aria-label="Scan target" :disabled="status === 'running'" />
-        <small v-if="scan">Last scan: {{ scan.target }}</small>
-      </div>
-    </section>
-
-    <div v-if="error" class="error-banner">
-      <div>
-        <strong>{{ status === 'failed' ? 'Scan failed' : 'Unable to load scan results' }}</strong>
-        <span>
-          {{ error }}
-        </span>
-      </div>
-
-      <button type="button" @click="refreshScan">
-        Retry
-      </button>
+    <div v-if="error" class="notice alert" role="alert">
+      <strong>Something went wrong</strong>
+      <span>{{ error }}</span>
+      <button class="button small" type="button" @click="loadAll">Retry</button>
     </div>
 
-    <div v-if="status === 'loading'" class="loading-banner">
-      Loading the latest scan results...
+    <div v-if="!agent" class="notice">
+      <strong>The agent is not running.</strong>
+      <span>Start it on this machine to scan from here: <code>{{ AGENT_COMMAND }}</code></span>
+      <button class="button small" type="button" @click="copyCommand">{{ copied ? 'Copied' : 'Copy' }}</button>
     </div>
 
-    <section class="overview-grid">
-      <article :class="['score-card', scoreClass]">
-        <div class="card-heading">
-          <div>
-            <span class="card-label">SECURITY SCORE</span>
-            <h3>Overall posture</h3>
+    <main>
+      <section class="exposure develop" aria-label="Network exposure">
+        <ApertureDial :score="score" :scanning="scanning" />
+
+        <div class="reading">
+          <span class="eyebrow">Network exposure{{ scan ? ` · ${scan.target}` : '' }}</span>
+
+          <div class="score-line">
+            <span :class="['score', { empty: score === null }]">{{ score === null ? '—' : animatedScore }}</span>
+            <span class="score-unit">/ 100</span>
+            <span :class="['verdict', { alarm: verdictAlarm }]">{{ verdict }}</span>
           </div>
 
-          <span :class="['score-status', scoreClass]">
-            {{ scoreLabel }}
-          </span>
-        </div>
+          <p class="summary" aria-live="polite">{{ scanning ? 'Taking a reading…' : summary }}</p>
 
-        <div class="score-content">
-          <div class="score-ring" :class="scoreClass" :style="scoreRingStyle">
-            <div>
-              <strong>{{ score }}</strong>
-              <span>/ 100</span>
-            </div>
-          </div>
+          <PortStrip v-if="scan?.port_states" :states="scan.port_states" :services="scan.services ?? []" />
 
-          <div class="score-info">
-            <p>
-              Based on the vulnerabilities and network exposure detected during
-              the latest scan.
-            </p>
-
-            <div class="score-bar">
-              <span
-                :style="{ width: `${score}%` }"
-              />
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <StatCard
-        label="Critical"
-        title="Immediate action"
-        :value="criticalCount"
-        variant="critical"
-        description="Critical findings"
-      />
-
-      <StatCard
-        label="High"
-        title="High priority"
-        :value="highCount"
-        variant="high"
-        description="High severity findings"
-      />
-
-      <StatCard
-        label="Open ports"
-        title="Network exposure"
-        :value="openPorts"
-        variant="neutral"
-        description="Detected open ports"
-      />
-    </section>
-
-    <section class="content-grid">
-      <article class="panel findings-panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">PRIORITY</span>
-            <h3>Security findings</h3>
-          </div>
-
-          <span class="count-badge">
-            {{ findings.length }} total
-          </span>
-        </div>
-
-        <div v-if="topFindings.length" class="findings-list">
-          <FindingCard
-            v-for="(finding, index) in topFindings"
-            :key="finding.id ?? finding.cve ?? index"
-            :finding="finding"
-            @view="selectedFinding = $event"
-          />
-        </div>
-
-        <button
-          v-if="findings.length > 5"
-          class="show-all-button"
-          type="button"
-          @click="showAllFindings = !showAllFindings"
-        >
-          {{ showAllFindings ? 'Show priority findings' : 'View all findings' }}
-        </button>
-
-        <div v-else-if="!scan" class="empty-state">
-          <div class="empty-icon">—</div>
-          <strong>No scan available</strong>
-          <p>Run a scan to build the first security overview.</p>
-        </div>
-
-        <div v-else class="empty-state">
-          <div class="empty-icon">✓</div>
-          <strong>No findings detected</strong>
-          <p>
-            AttackLens did not report any vulnerabilities for this scan.
+          <p v-if="scan" class="provenance">
+            <span>{{ vantage }}</span>
+            <span>{{ formatDate(scan.completed_at) }}</span>
+            <span v-if="scan.duration_seconds !== undefined">{{ scan.duration_seconds.toFixed(1) }} s</span>
           </p>
         </div>
-      </article>
+      </section>
 
-      <article class="panel distribution-panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">BREAKDOWN</span>
-            <h3>Severity distribution</h3>
-          </div>
+      <dl class="tally develop" style="--i: 1">
+        <div v-for="item in tally" :key="item.severity" :class="{ zero: !item.count }">
+          <dt><SeverityMark :severity="item.severity" labelled /></dt>
+          <dd>{{ item.count }}</dd>
         </div>
+      </dl>
 
-        <div class="severity-list">
-          <div class="severity-row">
-            <div class="severity-name">
-              <span class="severity-dot critical" />
-              <span>Critical</span>
-            </div>
-
-            <strong>{{ criticalCount }}</strong>
-          </div>
-
-          <div class="severity-track">
-            <span
-              class="critical"
-              :style="{
-                width: `${findings.length ? (criticalCount / findings.length) * 100 : 0}%`,
-              }"
-            />
-          </div>
-
-          <div class="severity-row">
-            <div class="severity-name">
-              <span class="severity-dot high" />
-              <span>High</span>
-            </div>
-
-            <strong>{{ highCount }}</strong>
-          </div>
-
-          <div class="severity-track">
-            <span
-              class="high"
-              :style="{
-                width: `${findings.length ? (highCount / findings.length) * 100 : 0}%`,
-              }"
-            />
-          </div>
-
-          <div class="severity-row">
-            <div class="severity-name">
-              <span class="severity-dot medium" />
-              <span>Medium</span>
-            </div>
-
-            <strong>{{ mediumCount }}</strong>
-          </div>
-
-          <div class="severity-track">
-            <span
-              class="medium"
-              :style="{
-                width: `${findings.length ? (mediumCount / findings.length) * 100 : 0}%`,
-              }"
-            />
-          </div>
-
-          <div class="severity-row">
-            <div class="severity-name">
-              <span class="severity-dot low" />
-              <span>Low</span>
-            </div>
-
-            <strong>{{ lowCount }}</strong>
-          </div>
-
-          <div class="severity-track">
-            <span
-              class="low"
-              :style="{
-                width: `${findings.length ? (lowCount / findings.length) * 100 : 0}%`,
-              }"
-            />
-          </div>
+      <dl v-if="hostReport" class="readouts develop" style="--i: 2">
+        <div>
+          <dt class="eyebrow">Firewall</dt>
+          <dd :class="{ warning: firewallWeak }">{{ hostReport.firewall.status }}</dd>
         </div>
-      </article>
-    </section>
-
-    <section class="bottom-grid">
-      <article class="panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">NETWORK</span>
-            <h3>Exposure overview</h3>
-          </div>
+        <div>
+          <dt class="eyebrow">Beyond loopback</dt>
+          <dd>{{ listenersBeyondLoopback }} of {{ hostReport.listeners.items.length }} listeners</dd>
         </div>
-
-        <div class="network-stat">
-          <div class="network-number">
-            {{ openPorts }}
-          </div>
-
-          <div>
-            <strong>Open ports detected</strong>
-            <p>
-              Review exposed services and make sure only required services are
-              reachable.
-            </p>
-          </div>
+        <div>
+          <dt class="eyebrow">Installed software</dt>
+          <dd>{{ hostReport.packages.items.length }}</dd>
         </div>
-
-        <div class="network-footer">
-          <span>Network surface</span>
-          <strong>
-            {{ openPorts ? `${openPorts} exposed service${openPorts === 1 ? '' : 's'}` : 'No open ports detected' }}
-          </strong>
+        <div>
+          <dt class="eyebrow">Known vulnerabilities</dt>
+          <dd>{{ vulnerabilityLabel }}</dd>
         </div>
+      </dl>
 
-        <ul v-if="scan?.services?.length" class="service-list">
-          <li v-for="service in scan.services" :key="`${service.name}-${service.port}`">
-            <span>{{ service.name }}</span>
-            <span>{{ service.protocol?.toUpperCase() ?? 'TCP' }} / {{ service.port }}</span>
-          </li>
-        </ul>
-      </article>
+      <section class="desk develop" style="--i: 3">
+        <FindingLedger
+          :network="findings"
+          :host="hostReport?.findings ?? []"
+          :host-name="hostReport?.target"
+          :empty-title="emptyTitle"
+          :empty-text="emptyText"
+          @view="selectedFinding = $event"
+        />
+        <ChangesPanel
+          :alerts="alerts"
+          :history="history"
+          :comparison="comparison"
+          :current-scan-id="scan?.scan_id"
+          @compare="compareWith"
+        />
+      </section>
 
-      <article class="panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">SCAN</span>
-            <h3>Latest scan</h3>
-          </div>
-        </div>
+      <RuntimePanel :inventory="inventory" :vulnerabilities="vulnerabilities" :posture="posture" />
+    </main>
 
-        <dl class="scan-details">
-          <div>
-            <dt>Target</dt>
-            <dd>{{ scan?.target ?? '—' }}</dd>
-          </div>
-
-          <div>
-            <dt>Completed</dt>
-            <dd>{{ formattedDate }}</dd>
-          </div>
-
-          <div>
-            <dt>Duration</dt>
-            <dd>{{ formattedDuration }}</dd>
-          </div>
-
-          <div>
-            <dt>Findings</dt>
-            <dd>{{ findings.length }}</dd>
-          </div>
-        </dl>
-      </article>
-
-      <article v-if="inventory" class="panel inventory-panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">HOST INVENTORY</span>
-            <h3>Runtime environment</h3>
-          </div>
-          <span class="count-badge">{{ inventory.scope }}</span>
-        </div>
-
-        <dl class="inventory-grid">
-          <div>
-            <dt>Hostname</dt>
-            <dd>{{ inventory.hostname }}</dd>
-          </div>
-          <div>
-            <dt>Operating system</dt>
-            <dd>{{ inventory.os.system }} {{ inventory.os.release }}</dd>
-          </div>
-          <div>
-            <dt>User</dt>
-            <dd>{{ inventory.current_user }}</dd>
-          </div>
-          <div>
-            <dt>CPU</dt>
-            <dd>{{ inventory.cpu.logical_count ?? '—' }} logical / {{ inventory.cpu.percent_used }}%</dd>
-          </div>
-          <div>
-            <dt>Memory</dt>
-            <dd>{{ inventory.memory.percent_used }}% used / {{ formatBytes(inventory.memory.total_bytes) }}</dd>
-          </div>
-          <div>
-            <dt>Processes</dt>
-            <dd>{{ inventory.processes.length }}</dd>
-          </div>
-          <div>
-            <dt>Network interfaces</dt>
-            <dd>{{ new Set(inventory.network_addresses.map((address) => address.interface)).size }}</dd>
-          </div>
-          <div>
-            <dt>Mounted disks</dt>
-            <dd>{{ inventory.disks.length }}</dd>
-          </div>
-          <div>
-            <dt>Runtime packages</dt>
-            <dd>{{ inventory.packages.length }}</dd>
-          </div>
-        </dl>
-
-        <div v-if="inventory.packages.length" class="package-list">
-          <div class="package-list-header">
-            <span class="card-label">INSTALLED PYTHON PACKAGES</span>
-            <span>{{ inventory.packages.length }} detected</span>
-          </div>
-          <ul>
-            <li v-for="packageInfo in inventory.packages.slice(0, 8)" :key="packageInfo.name">
-              <span>{{ packageInfo.name }}</span>
-              <code>{{ packageInfo.version }}</code>
-            </li>
-          </ul>
-        </div>
-      </article>
-
-      <article v-if="vulnerabilities" class="panel vulnerability-panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">PACKAGE SECURITY</span>
-            <h3>Known vulnerabilities</h3>
-          </div>
-          <span :class="['count-badge', vulnerabilities.vulnerabilities.length ? 'risk-count' : '']">
-            {{ vulnerabilities.vulnerabilities.length }} found
-          </span>
-        </div>
-
-        <div v-if="vulnerabilities.status === 'unavailable'" class="history-empty">
-          Vulnerability database unavailable. Package inventory is still available.
-        </div>
-
-        <div v-else-if="vulnerabilities.vulnerabilities.length" class="vulnerability-list">
-          <div v-for="vulnerability in vulnerabilities.vulnerabilities.slice(0, 6)" :key="`${vulnerability.id}-${vulnerability.package}`" class="vulnerability-row">
-            <div>
-              <strong>{{ vulnerability.id ?? 'Advisory' }}</strong>
-              <span>{{ vulnerability.package }} {{ vulnerability.version }}</span>
-              <span v-if="vulnerability.severity" class="vulnerability-cvss">
-                CVSS {{ vulnerability.severity }}
-              </span>
-            </div>
-            <div class="vulnerability-detail">
-              <p>{{ vulnerability.summary || vulnerability.details || 'No description available.' }}</p>
-              <span v-if="vulnerability.fixed_versions.length" class="patched-version">
-                Patched in {{ vulnerability.fixed_versions.join(', ') }}
-              </span>
-              <strong class="vulnerability-fix">Fix: {{ vulnerability.remediation }}</strong>
-              <a
-                v-if="vulnerability.references[0]"
-                :href="vulnerability.references[0]"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Read advisory
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="empty-state compact-empty">
-          <strong>No known package vulnerabilities detected</strong>
-          <p>{{ vulnerabilities.packages_checked }} packages checked against OSV.</p>
-        </div>
-      </article>
-
-      <article v-if="posture" class="panel posture-panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">CONFIGURATION</span>
-            <h3>Security posture</h3>
-          </div>
-          <span class="count-badge">
-            {{ posture.summary.failures }} failures / {{ posture.summary.warnings }} warnings
-          </span>
-        </div>
-
-        <div class="posture-list">
-          <div v-for="check in posture.checks" :key="check.id" class="posture-row">
-            <span :class="['posture-status', check.status]">{{ check.status }}</span>
-            <div>
-              <strong>{{ check.title }}</strong>
-              <p>{{ check.description }}</p>
-              <small>Fix: {{ check.remediation }}</small>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <article class="panel comparison-panel">
-        <div class="panel-header">
-          <div>
-            <span class="card-label">CHANGE ANALYSIS</span>
-            <h3>Compare with a previous scan</h3>
-          </div>
-        </div>
-
-        <div v-if="scan?.scan_id && history.length > 1" class="comparison-controls">
-          <select v-model="comparisonTarget" aria-label="Previous scan to compare">
-            <option disabled value="">Select a previous scan</option>
-            <option
-              v-for="item in history.filter((entry) => entry.scan_id !== scan?.scan_id)"
-              :key="item.scan_id"
-              :value="item.scan_id"
-            >
-              {{ item.completed_at ? new Date(item.completed_at).toLocaleString() : item.scan_id }}
-            </option>
-          </select>
-          <button class="show-all-button" type="button" :disabled="!comparisonTarget" @click="compareWithSelectedScan">
-            Compare
-          </button>
-        </div>
-
-        <div v-if="comparison" class="comparison-summary">
-          <div><strong>{{ comparison.score_delta > 0 ? '+' : '' }}{{ comparison.score_delta }}</strong><span>score change</span></div>
-          <div><strong>{{ comparison.new_findings.length }}</strong><span>new findings</span></div>
-          <div><strong>{{ comparison.fixed_findings.length }}</strong><span>fixed findings</span></div>
-          <div><strong>{{ comparison.persistent_findings.length }}</strong><span>still present</span></div>
-          <p>Ports added: {{ comparison.ports_added.length ? comparison.ports_added.join(', ') : 'none' }}. Ports removed: {{ comparison.ports_removed.length ? comparison.ports_removed.join(', ') : 'none' }}.</p>
-        </div>
-
-        <div v-else class="history-empty">
-          Run at least two scans to compare changes over time.
-        </div>
-      </article>
-    </section>
-
-    <div
-      v-if="selectedFinding"
-      class="modal-backdrop"
-      role="presentation"
-      @click.self="selectedFinding = null"
-    >
-      <article
-        class="finding-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="finding-modal-title"
-      >
-        <div class="modal-header">
-          <div>
-            <span :class="['severity-badge', selectedFinding.severity?.toLowerCase() ?? 'unknown']">
-              {{ selectedFinding.severity ?? 'Unknown' }}
-            </span>
-            <h3 id="finding-modal-title">
-              {{ selectedFinding.title ?? 'Security finding' }}
-            </h3>
-          </div>
-          <button class="modal-close" type="button" aria-label="Close details" @click="selectedFinding = null">
-            ×
-          </button>
-        </div>
-
-        <p class="modal-description">
-          {{ selectedFinding.description ?? 'No description provided.' }}
-        </p>
-
-        <div v-if="selectedFinding.risk_reason" class="risk-summary">
-          <span class="card-label">WHY IT MATTERS</span>
-          <p>{{ selectedFinding.risk_reason }}</p>
-        </div>
-
-        <dl class="finding-details">
-          <div v-if="selectedFinding.cve">
-            <dt>CVE</dt>
-            <dd>{{ selectedFinding.cve }}</dd>
-          </div>
-          <div v-if="selectedFinding.cvss !== undefined">
-            <dt>CVSS</dt>
-            <dd>{{ selectedFinding.cvss }}</dd>
-          </div>
-          <div v-if="selectedFinding.service">
-            <dt>Service</dt>
-            <dd>{{ selectedFinding.service }}</dd>
-          </div>
-          <div v-if="selectedFinding.port">
-            <dt>Port</dt>
-            <dd>{{ selectedFinding.port }}</dd>
-          </div>
-          <div v-if="selectedFinding.version">
-            <dt>Version</dt>
-            <dd>{{ selectedFinding.version }}</dd>
-          </div>
-          <div v-if="selectedFinding.evidence">
-            <dt>Evidence</dt>
-            <dd>{{ selectedFinding.evidence }}</dd>
-          </div>
-          <div v-if="selectedFinding.banner">
-            <dt>Banner</dt>
-            <dd>{{ selectedFinding.banner }}</dd>
-          </div>
-        </dl>
-
-        <div v-if="selectedFinding.remediation" class="remediation">
-          <span class="card-label">RECOMMENDATION</span>
-          <p>{{ selectedFinding.remediation }}</p>
-        </div>
-      </article>
-    </div>
+    <FindingDrawer :finding="selectedFinding" @close="selectedFinding = null" @decide="decide" />
 
     <footer>
       <span>AttackLens</span>
-      <span>Network security scanner</span>
+      <span>Listening on an interface does not prove a service is reachable from other machines.</span>
     </footer>
-  </main>
+  </div>
 </template>
-```

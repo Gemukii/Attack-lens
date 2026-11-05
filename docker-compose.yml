@@ -1,5 +1,7 @@
 services:
   api:
+    # Always run the current code: a stale image breaks on a newer configuration.
+    pull_policy: build
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,14 +21,21 @@ services:
     environment:
       ATTACKLENS_DEFAULT_TARGET: ${ATTACKLENS_DEFAULT_TARGET:-host.docker.internal}
       ATTACKLENS_INVENTORY_SCOPE: container
+      ATTACKLENS_DB_PATH: /app/data/attacklens.db
       ATTACKLENS_RESULTS_DIR: /app/results
       ATTACKLENS_CORS_ORIGINS: ${ATTACKLENS_CORS_ORIGINS:-http://localhost:3000}
       ATTACKLENS_API_KEY: ${ATTACKLENS_API_KEY:-}
       ATTACKLENS_ALLOWED_TARGETS: ${ATTACKLENS_ALLOWED_TARGETS:-}
+      ATTACKLENS_ENABLE_OSV: ${ATTACKLENS_ENABLE_OSV:-false}
+      ATTACKLENS_ALERT_WEBHOOK_URL: ${ATTACKLENS_ALERT_WEBHOOK_URL:-}
+      ATTACKLENS_ALERT_MIN_SEVERITY: ${ATTACKLENS_ALERT_MIN_SEVERITY:-low}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./results:/app/results
+      # The API owns the database. A named volume keeps SQLite locking reliable.
+      - attacklens-data:/app/data
+      # Only read once, to import JSON results written by earlier versions.
+      - ./results:/app/results:ro
     healthcheck:
       test:
         - CMD
@@ -39,6 +48,7 @@ services:
       start_period: 10s
 
   dashboard:
+    pull_policy: build
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -55,10 +65,12 @@ services:
     tmpfs:
       - /tmp
     environment:
-      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE}
-      API_INTERNAL_BASE: ${API_INTERNAL_BASE}
+      NUXT_API_INTERNAL_BASE: http://api:8000
+      NUXT_API_KEY: ${ATTACKLENS_API_KEY:-}
       NUXT_PUBLIC_SCAN_TARGET: ${ATTACKLENS_DEFAULT_TARGET:-host.docker.internal}
     depends_on:
       api:
         condition: service_healthy
 
+volumes:
+  attacklens-data:

@@ -1,11 +1,11 @@
 """Local host inventory collection for AttackLens."""
 
 import getpass
-from importlib.metadata import distributions
 import os
 import platform
 import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from importlib.metadata import distributions
 from pathlib import Path
 from typing import Any
 
@@ -84,7 +84,7 @@ def collect_inventory(scope: str = "runtime") -> dict[str, Any]:
     """Collect safe system metadata from the process runtime."""
     memory = psutil.virtual_memory()
     return {
-        "collected_at": datetime.now(timezone.utc).isoformat(),
+        "collected_at": datetime.now(UTC).isoformat(),
         "scope": scope,
         "hostname": socket.gethostname(),
         "current_user": getpass.getuser(),

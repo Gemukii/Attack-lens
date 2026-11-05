@@ -51,7 +51,8 @@ def collect_posture(scope: str = "runtime") -> dict[str, Any]:
 
     secret_names = sorted(
         name
-        for name in os.environ
+        for name, value in os.environ.items()
+        if value and not name.upper().startswith("ATTACKLENS_")
         if any(token in name.upper() for token in ("PASSWORD", "SECRET", "TOKEN", "API_KEY"))
     )
     checks.append(
@@ -79,7 +80,7 @@ def collect_posture(scope: str = "runtime") -> dict[str, Any]:
             "description": "The host firewall cannot be assessed from the API container."
             if scope == "container"
             else "Firewall inspection is not implemented yet.",
-            "remediation": "Run a native host agent to inspect firewall policy.",
+            "remediation": "Run `attacklens agent` on the host to inspect its firewall.",
         }
     )
 
