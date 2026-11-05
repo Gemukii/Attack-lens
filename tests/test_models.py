@@ -23,6 +23,14 @@ def test_finding_to_dict() -> None:
     assert result["finding_id"] == finding.stable_id()
 
 
+def test_finding_id_depends_on_the_asset() -> None:
+    """The same service on two hosts is two findings."""
+    first = Finding("network", "high", "SMB", "d", target="a", port=445)
+    second = Finding("network", "high", "SMB", "d", target="b", port=445)
+
+    assert first.stable_id() != second.stable_id()
+
+
 def test_finding_id_ignores_volatile_evidence() -> None:
     """A service remains the same finding when its banner changes."""
     first = Finding(

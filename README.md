@@ -1,483 +1,239 @@
 # AttackLens
 
-AttackLens is a self-hosted cybersecurity scanner designed to identify security issues on personal machines and servers.
+AttackLens is a self-hosted security scanner for personal machines and servers. It
+shows what your machines expose, tracks what changes over time, and alerts you when
+something new appears.
 
-The project combines a Python-based scanning engine with a web dashboard to provide a clear view of detected security findings.
+> **Status:** Early development
 
-> **Status:** Early development — MVP
+## How it sees your machines
 
-## Overview
+AttackLens looks at a machine from two sides, because each one misses things:
 
-AttackLens is designed to progressively cover several areas of system security:
+| View | Command | Sees | Cannot tell |
+| --- | --- | --- | --- |
+| **Network scan** | `attacklens scan --network` | Common TCP ports reachable from where the scan runs, plus service banners | Which process owns a port, or ports outside the common list |
+| **Host agent** | `attacklens agent` | Every listening TCP socket, its process and bind address, the firewall state, and installed software | Whether another machine can actually reach a socket |
 
-* Network exposure
-* System configuration
-* Docker security
-* Web and TLS configuration
-* Vulnerability and CVE analysis
-* Security posture monitoring
-
-The current MVP focuses on **network service discovery** and provides a web dashboard for viewing scan results.
-
-## Architecture
+A socket bound to `0.0.0.0` listens on every interface, but the firewall may still
+block it. This is why host reports list findings without an exposure score.
 
 ```text
-                         AttackLens
-                              │
-                 ┌────────────┴────────────┐
-                 │                         │
-              Scanner                  Dashboard
-                 │                         │
-          Python / CLI              Nuxt / Vue
-                 │                         │
-                 ▼                         │
-        results/latest.json               │
-                 │                         │
-                 ▼                         │
-             FastAPI API ◄────────────────┘
-                 │
-               :8000
-
-Dashboard
-   │
-   └── :3000
+ attacklens agent          attacklens scan --network      Dashboard "Run scan"
+ (on the host)             (CLI)                                 │
+        │                         │                              ▼
+        └──────────┬──────────────┘                     Nuxt dashboard :3000
+                   │                                    server-side proxy,
+                   │ local SQLite, or                   adds the API key
+                   │ POST /api/reports                           │
+                   ▼                                             ▼
+             Change detection ◄──────────────────────────── FastAPI :8000
+             SQLite · alerts · triage
 ```
 
-The current data flow is:
+When the API runs in Docker, it owns the database and the agent must send its reports
+over HTTP with `--api-url`. SQLite locking is not reliable across a bind mount shared
+between a host and a container.
 
-```text
-CLI
- ↓
-Network Scanner
- ↓
-Finding[]
- ↓
-results/latest.json
- ↓
-FastAPI
- ↓
-Nuxt Dashboard
-```
-
-## Project Structure
-
-```text
-Attack-lens/
-├── frontend/
-│   ├── app/
-│   │   ├── app.vue
-│   │   └── pages/
-│   │       └── index.vue
-│   ├── public/
-│   ├── Dockerfile
-│   ├── nuxt.config.ts
-│   ├── package.json
-│   └── package-lock.json
-│
-├── src/
-│   └── attacklens/
-│       ├── web/
-│       │   └── api.py
-│       ├── __init__.py
-│       ├── cli.py
-│       ├── models.py
-│       ├── results.py
-│       └── scanner.py
-│
-├── tests/
-│   ├── test_cli.py
-│   ├── test_models.py
-│   ├── test_results.py
-│   └── test_scanner.py
-│
-├── results/
-│   └── .gitkeep
-│
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml
-├── README.md
-└── SECURITY.md
-```
-
-## Current Features
-
-### Network scanning
-
-The current scanner checks common TCP ports on a target host and reports detected services.
-
-Currently supported examples include:
-
-* SSH
-* FTP
-* Telnet
-* HTTP / HTTPS
-* SMTP
-* DNS
-* SMB
-* MySQL
-* PostgreSQL
-* Redis
-
-Each detected service is represented as a security finding containing:
-
-* Category
-* Severity
-* Title
-* Description
-* Evidence
-* Remediation
-* References
-
-### Scan result persistence
-
-Scan results are currently stored in:
-
-```text
-results/latest.json
-```
-
-This provides a simple interface between the scanner and the web dashboard while the project is still in its MVP stage.
-
-### Web API
-
-The FastAPI backend currently exposes:
-
-```text
-GET /api/health
-POST /api/scan
-GET /api/results
-GET /api/scans
-GET /api/scans/compare?before_id=<id>&after_id=<id>
-GET /api/inventory
-GET /api/vulnerabilities
-GET /api/posture
-```
-
-`/api/health` provides a basic API health check.
-
-`/api/results` returns the latest stored scan results.
-
-`POST /api/scan` is synchronous. It expects a JSON body such as
-`{"target":"127.0.0.1"}` and returns the same result document as
-`GET /api/results`. A successful response includes `findings`, `score`,
-`open_ports`, `services`, `completed_at`, and `duration_seconds`. It returns
-`404` from `/api/results` when no scan has been stored yet.
-
-Each completed scan is also stored in `results/history/<scan-id>.json` and is
-returned by `GET /api/scans`, newest first. History entries contain the score,
-findings, target, duration, detected services, and completion time.
-The comparison endpoint reports new, fixed, and persistent findings, plus
-score changes and ports added or removed between two scans.
-
-`GET /api/inventory` returns safe metadata from the environment running the
-API: operating system, hostname, user, CPU, memory, disks, network addresses,
-and a bounded process list, plus installed Python packages and versions. In
-Docker, its scope is explicitly `container`; it does not claim to be a full
-inventory of the host machine or its Windows-installed software.
-
-`GET /api/vulnerabilities` checks the visible Python packages against the OSV
-public vulnerability database. It is independent from the network scan and
-returns `status: unavailable` when the external advisory service cannot be
-reached.
-
-`GET /api/posture` runs non-invasive configuration checks for the API runtime,
-including root privileges, Docker socket exposure, sensitive environment
-variable names, and host firewall visibility.
-
-The `score` is a bounded network-exposure score from 0 to 100. It is calculated
-from network finding severities only; package vulnerabilities and posture checks
-remain separate reports because they use different evidence and risk scales.
-
-The CLI and API share their result directory through `ATTACKLENS_RESULTS_DIR`.
-Docker Compose binds the local `results/` directory to `/app/results`, so scans
-run on the host and scans run by the API use the same files. The API also
-supports these optional safeguards:
-
-* `ATTACKLENS_API_KEY` protects API endpoints with the `X-API-Key` header.
-* `ATTACKLENS_CORS_ORIGINS` configures the comma-separated allowed origins.
-* `ATTACKLENS_ALLOWED_TARGETS` limits scans to a comma-separated host allowlist.
-* Only one network scan runs at a time; concurrent requests receive HTTP 429.
-
-Results are written through temporary files and atomically replaced. Invalid
-stored documents are rejected by the API instead of being returned as a 500
-error, and historical comparisons use stable finding identifiers.
-
-When running with Docker, the default target is `host.docker.internal`, which
-refers to the host machine from inside the API container. Override it with
-`ATTACKLENS_DEFAULT_TARGET` when scanning another host.
-
-The package inventory shown by the dashboard belongs to the API runtime. When
-using Docker, rebuild the API image after changing Python packages:
-
-```powershell
-docker compose build --no-cache api
-docker compose up -d api
-```
-
-The API container runs as the unprivileged `attacklens` user, and the dashboard
-runs as the unprivileged Node `node` user. Both use `no-new-privileges`.
-Scan results are stored in the persistent Docker volume `attacklens-results`,
-which avoids host bind-mount permission issues while preserving data across
-container recreation.
-
-The Compose setup also drops all Linux capabilities, uses a read-only API
-filesystem, limits CPU/memory/processes, binds local ports to `127.0.0.1`, and
-waits for the API healthcheck before starting the dashboard.
-
-### Dashboard
-
-The Nuxt dashboard currently provides:
-
-* Target information
-* Finding count
-* Severity counts
-* Latest scan information
-* Detected findings
-* Evidence for each finding
-
-The dashboard is intentionally kept lightweight during the MVP to make the architecture easy to evolve.
-
-## Installation
-
-### Requirements
-
-* Python 3.12+
-* Node.js 22+
-* npm
-* Git
-
-### Clone the repository
+## Quick start with Docker
 
 ```bash
-git clone https://github.com/Gemukii/Attack-lens.git
-cd Attack-lens
+docker compose up
 ```
 
-### Python environment
-
-Create a virtual environment:
-
-```bash
-python -m venv .venv
-```
-
-Activate it on Windows:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-Install AttackLens in editable mode:
-
-```bash
-python -m pip install -e .
-```
-
-## Running a Scan
-
-Run a network scan against localhost:
-
-```bash
-python -m attacklens.cli scan --network
-```
-
-Specify another target:
-
-```bash
-python -m attacklens.cli scan --network --host 192.168.1.10
-```
-
-Output results as JSON:
-
-```bash
-python -m attacklens.cli scan --network --json
-```
-
-The scan automatically saves its results to:
-
-```text
-results/latest.json
-```
-
-## Running the API
-
-Start the FastAPI backend:
-
-```bash
-uvicorn attacklens.web.api:app --reload
-```
-
-The API will be available at:
-
-```text
-http://localhost:8000
-```
-
-Health check:
-
-```text
-http://localhost:8000/api/health
-```
-
-Results:
-
-```text
-http://localhost:8000/api/results
-```
-
-## Running the Dashboard
-
-Install the frontend dependencies:
-
-```bash
-cd frontend
-npm install
-```
-
-Start the Nuxt development server:
-
-```bash
-npm run dev
-```
-
-The dashboard will be available at:
-
-```text
-http://localhost:3000
-```
-
-The dashboard retrieves scan results from the FastAPI backend.
-
-## Docker
-
-AttackLens can also be started using Docker Compose.
-
-From the project root:
-
-```bash
-docker compose up --build
-```
-
-This starts:
+Images are rebuilt on each start, so they always match the code.
 
 | Service   |   Port | Description        |
 | --------- | -----: | ------------------ |
 | Dashboard | `3000` | Nuxt web interface |
 | API       | `8000` | FastAPI backend    |
 
-The `results/` directory is shared with the API container so that scan results generated by the CLI can be displayed by the dashboard.
+Both are bound to `127.0.0.1`.
+
+Then start the agent on the machine itself, not in a container, and leave it running:
+
+```bash
+python -m venv .venv
+python -m pip install -e .
+attacklens agent --watch --api-url http://127.0.0.1:8000
+```
+
+On Windows, activate the environment first with `.venv\Scripts\Activate.ps1`.
+
+The dashboard shows when the agent is connected. `Run scan` then asks it to scan from
+your machine: it probes the machine's network address, which leaves out the services
+other machines cannot reach, and refreshes the host report. To scan another device
+from your machine, type its address in the target field.
+
+Without the agent, the button becomes `Scan from Docker` and scans
+`host.docker.internal` from the API container, a view that misses part of the machine.
+
+## Running without Docker
+
+Requires Python 3.12+ and Node.js 22+.
+
+```bash
+python -m pip install -e ".[dev]"
+uvicorn attacklens.web.api:app --reload
+```
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The CLI, the agent, and the API then share `results/attacklens.db`, so `--api-url` is
+not needed, except for `--watch`.
+
+## Command line
+
+```bash
+attacklens scan --network                  # scan 127.0.0.1
+attacklens scan --network --host 192.168.1.10
+attacklens scan --network --json           # full result document
+attacklens scan --network --fail-on high   # exit 1 on a high or critical finding
+attacklens agent                           # inspect this machine once
+attacklens agent --watch --api-url URL     # take scan orders from the dashboard
+```
+
+| Exit code | Meaning |
+| --------: | --- |
+| `0` | Completed |
+| `1` | A finding reached the `--fail-on` severity |
+| `2` | Nothing was observed: unknown host, no port answered, or the API was unreachable |
+
+## What a result means
+
+Every port probe ends in one of three states:
+
+* **open**: the port accepted the connection.
+* **closed**: the host refused it, which proves the host is alive.
+* **filtered**: nothing answered.
+
+If every port is filtered, the scan status is `no_response` and the score is `null`:
+the target is down or fully filtered, and nothing was observed. This is not a clean
+result.
+
+The score goes from 0 to 100, higher is better. It only reflects the network exposure
+of a scan, and leaves out findings marked as accepted or false positive. The score at
+scan time stays available as `raw_score`.
+
+Probes wait 3 seconds, in parallel. Windows takes about 2 seconds to refuse a
+connection, so a shorter timeout reports closed ports as filtered.
+
+## Alerts and scheduled runs
+
+Each new scan is compared with the last complete scan of the same target. A new
+finding creates an alert in the dashboard, and is sent to a webhook if one is set.
+The first scan of a target is a baseline and raises no alert. Findings you dismissed
+do not alert again.
+
+For regular reports, add `--interval 3600` to `--watch`, or schedule single runs with
+the tools of your system. The API key, if any, is read from `ATTACKLENS_API_KEY`.
+
+On Windows, from an elevated prompt or for your own user:
+
+```powershell
+schtasks /Create /SC HOURLY /TN "AttackLens agent" /TR "C:\path\to\.venv\Scripts\attacklens.exe agent --api-url http://127.0.0.1:8000"
+```
+
+On Linux, with cron:
+
+```text
+0 * * * * /path/to/.venv/bin/attacklens agent --api-url http://127.0.0.1:8000
+```
+
+## Triage
+
+Open a finding in the dashboard to accept the risk or mark a false positive, with an
+optional reason. It stays visible but stops counting in the score and in alerts. Use
+`Reopen` to reverse the decision. Findings are identified per target, so a decision
+on one machine does not affect another.
+
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ATTACKLENS_API_KEY` | empty | Protects the API with the `X-API-Key` header. An empty value means no key. |
+| `ATTACKLENS_API_URL` | empty | Default for `--api-url`. |
+| `ATTACKLENS_ALLOWED_TARGETS` | empty | Comma-separated allowlist of scan targets. |
+| `ATTACKLENS_ALLOWED_HOSTS` | `localhost,127.0.0.1,api` | Host headers accepted by the API. |
+| `ATTACKLENS_CORS_ORIGINS` | `http://localhost:3000` | Allowed browser origins for direct API calls. |
+| `ATTACKLENS_DEFAULT_TARGET` | `127.0.0.1` | Target of a scan without an explicit one. |
+| `ATTACKLENS_DB_PATH` | `results/attacklens.db` | Database location. |
+| `ATTACKLENS_RESULTS_DIR` | `results` | Location of JSON results from earlier versions. |
+| `ATTACKLENS_ENABLE_OSV` | `false` | Sends package names and versions to [OSV](https://osv.dev). |
+| `ATTACKLENS_ALERT_WEBHOOK_URL` | empty | Discord or Slack webhook. |
+| `ATTACKLENS_ALERT_MIN_SEVERITY` | `low` | Lowest severity that raises an alert. |
+
+The dashboard reads `NUXT_API_INTERNAL_BASE`, `NUXT_API_KEY`, `NUXT_ALLOWED_HOSTS`, and
+`NUXT_PUBLIC_SCAN_TARGET`. Docker Compose sets them for you.
+
+JSON results from earlier versions are imported automatically when the database is
+created. The JSON files are left untouched.
+
+## API
+
+```text
+GET  /api/health
+POST /api/scan                       run a network scan: {"target": "127.0.0.1"}
+POST /api/reports                    store a scan produced by the CLI or the agent
+GET  /api/results                    latest network scan
+GET  /api/host                       latest host report (?target=)
+GET  /api/scans                      history (?limit= &scan_type= &target=)
+GET  /api/scans/compare              ?before_id= &after_id=, for the same target
+PUT  /api/findings/{id}/triage       {"status": "accepted", "reason": "..."}
+GET  /api/alerts
+GET  /api/agents                     known host agents and whether they are online
+POST /api/jobs                       ask the agent to scan: {"target": null} for itself
+GET  /api/jobs/{id}                  state of a scan order
+POST /api/agent/poll                 heartbeat of an agent, returns its next order
+POST /api/agent/jobs/{id}/result     outcome of an order
+GET  /api/inventory                  the environment running the API
+GET  /api/vulnerabilities            Python packages of the API, when OSV is enabled
+GET  /api/posture                    configuration of the API runtime
+```
+
+The last three describe the runtime of the API. In Docker, that is the AttackLens
+container and not your machine: use the agent to inspect the host.
+
+## Known limits
+
+* The network scan covers 36 common TCP ports. There is no UDP.
+* The agent only lists TCP listeners.
+* Vulnerability lookups need Debian or Ubuntu LTS. OSV has no index of Windows
+  software, so Windows programs are inventoried but not checked.
+* Without elevated rights, Linux firewall rules are usually unreadable and reported
+  as `unknown`.
+* Inside and outside views are not correlated yet: nothing confirms automatically
+  whether a listener is reachable from another machine.
 
 ## Testing
 
-Run the test suite with:
-
 ```bash
 pytest
+ruff check src tests
 ```
-
-The tests currently cover:
-
-* Data models
-* Network scanner
-* CLI argument parsing
-* Result persistence
 
 ## Security
 
 AttackLens is intended for systems that you own or are explicitly authorized to assess.
-
 Do not use the scanner against systems without permission.
 
-See [`SECURITY.md`](SECURITY.md) for vulnerability reporting information.
+See [`SECURITY.md`](SECURITY.md) for the data handling policy and vulnerability
+reporting.
 
 ## Roadmap
 
-### MVP
-
-* [x] Python project structure
-* [x] Finding data model
-* [x] Basic network scanner
-* [x] CLI
-* [x] JSON result persistence
-* [x] FastAPI backend
-* [x] Initial Nuxt dashboard
-* [ ] Docker Compose integration
-* [ ] Complete dashboard/API integration
-
-### Network security
-
-* [ ] Local listening service discovery
-* [ ] Windows network inspection
-* [ ] Linux network inspection
-* [ ] Service and version detection
-* [ ] Network interface information
-* [ ] Suspicious exposure detection
-* [ ] TLS inspection
-
-### System security
-
-* [ ] Operating system information
-* [ ] User and privilege analysis
-* [ ] Firewall configuration
-* [ ] Security configuration checks
-* [ ] Running process analysis
-* [ ] System update status
-
-### Docker security
-
-* [ ] Container discovery
-* [ ] Image information
-* [ ] Exposed container ports
-* [ ] Privileged containers
-* [ ] Host networking checks
-* [ ] Docker socket exposure
-* [ ] Container configuration analysis
-
-### Vulnerability intelligence
-
-* [ ] CVE enrichment
-* [ ] CVSS information
-* [ ] CISA KEV integration
-* [ ] EPSS integration
-* [ ] Software version matching
-
-### Dashboard
-
-* [ ] Finding details
-* [ ] Finding filters
-* [ ] Scan history
-* [ ] Security posture overview
-* [ ] Network overview
-* [ ] System overview
-* [ ] Docker overview
-* [ ] Vulnerability overview
-* [ ] Export functionality
-
-## Development
-
-AttackLens follows a modular architecture so that new security checks can be added without rewriting the entire application.
-
-The long-term goal is to separate:
-
-```text
-Collectors
-    ↓
-Raw observations
-    ↓
-Security checks
-    ↓
-Findings
-    ↓
-Results
-    ↓
-API
-    ↓
-Dashboard
-```
-
-This architecture should allow AttackLens to progressively evolve from a simple local scanner into a broader self-hosted security assessment platform.
+* Correlation of the inside and outside views, with a remote probe
+* Nmap and Trivy integration
+* TLS inspection
+* Docker security checks: privileged containers, published ports
+* Active checks, such as Redis without authentication
+* CISA KEV and EPSS prioritization
+* Audit mode: engagements, enforced scope, and reports
 
 ## License
 
-See the repository for licensing information.
+[MIT](LICENSE)

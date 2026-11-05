@@ -52,6 +52,23 @@ flowchart LR
 
 No collected security information should be transmitted externally by default.
 
+Two features send data to third parties. Both are disabled until you configure them:
+
+* `ATTACKLENS_ENABLE_OSV` sends package names and versions to the public OSV database.
+* `ATTACKLENS_ALERT_WEBHOOK_URL` sends the target name and finding titles to your webhook.
+
+Network scans read service banners over TLS without validating certificates, because
+a scanner has to identify services that use self-signed certificates. These connections
+only send an anonymous `HEAD` request, and their answer is only displayed as a banner.
+
+## Host agent
+
+The agent only makes outbound calls to the API, so nothing has to reach into the host.
+It accepts a single kind of order, a network scan. It never executes a command received
+from the API, and validates scan targets itself. `ATTACKLENS_ALLOWED_TARGETS` restricts
+the targets the dashboard can send it. Whoever can reach the API can order scans from
+your machine, so set `ATTACKLENS_API_KEY` when the API is reachable beyond localhost.
+
 ## Privilege model
 
 AttackLens should follow the principle of least privilege.
