@@ -19,6 +19,7 @@ export interface AttackPathReport {
     severity: string
     certainty: 'confirmed' | 'potential'
     steps: Array<{ stage: string; label: string; finding_id: string | null }>
+    entries?: string[]
   }>
   best_cut: {
     finding_id: string

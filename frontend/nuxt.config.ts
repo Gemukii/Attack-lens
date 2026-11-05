@@ -4,11 +4,9 @@ export default defineNuxtConfig({
   },
 
   css: [
-    '@fontsource/ibm-plex-mono/400.css',
-    '@fontsource/ibm-plex-mono/500.css',
-    '@fontsource/ibm-plex-mono/600.css',
-    '@fontsource/barlow-condensed/500.css',
-    '@fontsource/barlow-condensed/600.css',
+    '@fontsource-variable/newsreader/opsz.css',
+    '@fontsource-variable/newsreader/opsz-italic.css',
+    '@fontsource-variable/hanken-grotesk/wght.css',
     '~/assets/css/main.css',
   ],
 

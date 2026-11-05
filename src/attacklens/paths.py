@@ -180,6 +180,20 @@ def _open_firewall(findings: list[dict[str, Any]]) -> dict[str, Any] | None:
     }
 
 
+ENTRY_PORTS = {
+    "remote-takeover": REMOTE_ACCESS_PORTS,
+    "data-theft": DATA_PORTS,
+    "docker-takeover": DOCKER_PORTS,
+    "open-firewall": REMOTE_ACCESS_PORTS | DATA_PORTS,
+}
+
+
+def _entry_ids(path_id: str, findings: list[dict[str, Any]]) -> list[str]:
+    """Return every finding that can start a path, not only the one it names."""
+    ports = ENTRY_PORTS.get(path_id, set())
+    return [item["finding_id"] for item in _reachable(findings, ports) if item.get("finding_id")]
+
+
 RULES = (
     _exploited_flaw,
     _docker_takeover,
@@ -196,6 +210,8 @@ def attack_paths(findings: list[dict[str, Any]]) -> dict[str, Any]:
     """Return the attack paths backed by these findings, and the best fix."""
     active = [item for item in findings if item.get("triage_status", "open") == "open"]
     paths = [path for rule in RULES if (path := rule(active)) is not None]
+    for path in paths:
+        path["entries"] = _entry_ids(path["id"], active)
     paths.sort(
         key=lambda path: (SEVERITY_RANK[path["severity"]], path["certainty"] != "confirmed")
     )

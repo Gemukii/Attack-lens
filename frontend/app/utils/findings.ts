@@ -11,10 +11,10 @@ export const byRisk = (a: Finding, b: Finding) =>
   || (a.port ?? 99999) - (b.port ?? 99999)
 
 export const REACHABILITY_LABELS: Record<string, string> = {
-  exposed: 'reachable',
-  shielded: 'blocked',
-  local: 'local',
-  unverified: 'not proved',
+  exposed: 'Reachable',
+  shielded: 'Blocked',
+  local: 'This machine only',
+  unverified: 'Not proved',
 }
 
 export const LAPSE_LABELS: Record<string, string> = {

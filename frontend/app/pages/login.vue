@@ -19,21 +19,15 @@ const login = async () => {
 </script>
 
 <template>
-  <div class="room login">
-    <form class="login-form develop" @submit.prevent="login">
-      <div class="brand">
-        <svg viewBox="-12 -12 24 24" aria-hidden="true">
-          <circle r="11" fill="none" stroke="var(--paper)" stroke-width="1.5" />
-          <polygon points="0,-5 4.8,-1.5 3,4 -3,4 -4.8,-1.5" fill="var(--safelight)" />
-        </svg>
-        AttackLens
-      </div>
+  <div class="login">
+    <form class="login-form" @submit.prevent="login">
+      <p class="wordmark">Attack<em>Lens</em></p>
       <label>
-        <span class="eyebrow">Password</span>
+        <span>Password</span>
         <input v-model="password" type="password" autocomplete="current-password" required autofocus />
       </label>
       <p v-if="failure" class="note" role="alert">{{ failure }}</p>
-      <button class="button primary" type="submit" :disabled="busy">Open the lab</button>
+      <button class="link" type="submit" :disabled="busy">Enter</button>
     </form>
   </div>
 </template>

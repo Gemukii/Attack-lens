@@ -365,6 +365,15 @@ def test_paths_are_sorted_and_the_best_cut_is_named() -> None:
     assert result["best_cut"]["paths_broken"] == 2
 
 
+def test_path_lists_every_possible_entry() -> None:
+    """The dashboard draws each entry point, not only the one the path names."""
+    rdp = _finding(title="RDP", port=3389, service="RDP")
+
+    path = attack_paths([SMB, rdp, ADMIN])["paths"][0]
+
+    assert set(path["entries"]) == {SMB["finding_id"], rdp["finding_id"]}
+
+
 def test_clean_machine_has_no_path() -> None:
     """No finding, no invented story."""
     assert attack_paths([]) == {"paths": [], "best_cut": None}

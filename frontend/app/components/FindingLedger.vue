@@ -32,7 +32,7 @@ const dismissed = computed(() => [...props.network, ...props.host].filter((findi
 
 const tabs = computed(() => [
   { id: 'network' as Tab, label: 'Network', count: networkOpen.value.length },
-  { id: 'machine' as Tab, label: props.hostName ?? 'This machine', count: machineOpen.value.length },
+  { id: 'machine' as Tab, label: 'Machine', count: machineOpen.value.length },
   { id: 'software' as Tab, label: 'Updates', count: software.value.length },
   { id: 'autostart' as Tab, label: 'Autostart', count: autostart.value.length },
   { id: 'dismissed' as Tab, label: 'Dismissed', count: dismissed.value.length },
@@ -47,14 +47,14 @@ const rows = computed(() => ({
 }[tab.value]))
 
 const EXPOSURE: Record<string, string> = {
-  all: 'all interfaces',
-  interface: 'specific interfaces',
+  all: 'open to every network',
+  interface: 'open to some networks',
   loopback: 'this machine only',
 }
 
 const detail = (finding: Finding) => {
   if (finding.category === 'network') return finding.version ?? finding.banner?.slice(0, 64) ?? ''
-  if (finding.exposure) return `bound to ${EXPOSURE[finding.exposure]}`
+  if (finding.exposure) return EXPOSURE[finding.exposure]
   return finding.evidence ?? ''
 }
 
@@ -64,20 +64,21 @@ const heading = (finding: Finding) => {
   return finding.title
 }
 
-const portLabel = (finding: Finding) => {
-  if (finding.port) return String(finding.port)
-  return finding.category === 'listener' ? 'dynamic' : '—'
+const status = (finding: Finding) => {
+  if (!isOpen(finding)) return finding.triage_status === 'accepted' ? 'Accepted' : 'False positive'
+  if (finding.triage_lapsed) return 'Reopened'
+  if (finding.known_exploited) return 'Exploited in the wild'
+  if (finding.verification === 'confirmed') return 'Confirmed'
+  return finding.reachability ? REACHABILITY_LABELS[finding.reachability] : ''
 }
 </script>
 
 <template>
-  <div class="ledger">
-    <div class="panel-head">
-      <div>
-        <span class="eyebrow">Findings</span>
-        <h2 class="section-title">What the scan found</h2>
-      </div>
-    </div>
+  <div class="findings">
+    <header class="page-head">
+      <h1>Everything found</h1>
+      <p class="lead">Sorted by what deserves your time first.</p>
+    </header>
 
     <div class="tabs" role="tablist" aria-label="Findings view">
       <button
@@ -89,47 +90,40 @@ const portLabel = (finding: Finding) => {
         :aria-selected="tab === item.id"
         @click="tab = item.id"
       >
-        {{ item.label }} {{ item.count }}
+        {{ item.label }}<sup>{{ item.count }}</sup>
       </button>
     </div>
 
-    <ul v-if="rows.length" :key="tab" class="ledger-rows">
+    <ul v-if="rows.length" :key="tab" class="rows">
       <li v-for="(finding, index) in rows" :key="finding.finding_id ?? index" :style="{ '--i': index }">
-        <button type="button" :class="['ledger-row', { dismissed: !isOpen(finding) }]" @click="emit('view', finding)">
-          <span class="ledger-severity"><SeverityMark :severity="finding.severity" labelled /></span>
-          <span class="ledger-port">{{ portLabel(finding) }}</span>
-          <span class="ledger-title">
-            <strong>{{ heading(finding) }}</strong>
-            <span>{{ detail(finding) }}</span>
+        <button type="button" :class="['row', { quiet: !isOpen(finding) }]" @click="emit('view', finding)">
+          <SeverityMark :severity="finding.severity" />
+          <span class="row-port">{{ finding.port ?? '' }}</span>
+          <span class="row-title">
+            <span>{{ heading(finding) }}</span>
+            <small>{{ detail(finding) }}</small>
           </span>
-          <span class="ledger-tags">
-            <span v-if="finding.risk?.priority === 'now'" class="tag urgent">now</span>
-            <span v-if="finding.verification === 'confirmed'" class="tag">proved</span>
-            <span v-if="finding.known_exploited" class="tag urgent">exploited</span>
-            <span v-if="finding.reachability" class="tag">{{ REACHABILITY_LABELS[finding.reachability] }}</span>
-            <span v-if="finding.triage_lapsed" class="tag">reopened</span>
-            <span v-if="!isOpen(finding)" class="tag">{{ finding.triage_status === 'accepted' ? 'accepted' : 'false positive' }}</span>
-          </span>
+          <span class="row-status">{{ status(finding) }}</span>
         </button>
       </li>
     </ul>
 
     <div v-else class="empty">
       <template v-if="tab === 'network'">
-        <strong>{{ emptyTitle }}</strong>
-        <p>{{ emptyText }}</p>
+        <p class="empty-title">{{ emptyTitle }}</p>
+        <p class="note">{{ emptyText }}</p>
       </template>
       <template v-else-if="tab === 'dismissed'">
-        <strong>Nothing dismissed</strong>
-        <p>Accepted risks and false positives appear here.</p>
+        <p class="empty-title">Nothing dismissed.</p>
+        <p class="note">Accepted risks and false positives appear here.</p>
       </template>
       <template v-else>
-        <strong>Nothing here</strong>
-        <p>{{ host.length ? 'No open finding in this view.' : 'Start the agent on this machine to fill this view.' }}</p>
+        <p class="empty-title">Nothing here.</p>
+        <p class="note">{{ host.length ? 'No open finding in this view.' : 'Run a scan with the agent connected to fill this view.' }}</p>
       </template>
     </div>
 
-    <button v-if="tab === 'machine' && machineInfoCount" class="text-button" type="button" @click="showInfo = !showInfo">
+    <button v-if="tab === 'machine' && machineInfoCount" class="link more" type="button" @click="showInfo = !showInfo">
       {{ showInfo ? 'Hide informational findings' : `Show ${machineInfoCount} informational findings` }}
     </button>
   </div>

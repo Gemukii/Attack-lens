@@ -6,11 +6,21 @@ const { results: scan, history, comparison, inventory, vulnerabilities, posture,
 const config = useRuntimeConfig()
 const dockerTarget = String(config.public.scanTarget)
 
+type View = 'brief' | 'findings' | 'machine' | 'journal'
+
+const VIEWS: Array<{ id: View; label: string }> = [
+  { id: 'brief', label: 'Brief' },
+  { id: 'findings', label: 'Findings' },
+  { id: 'machine', label: 'Machine' },
+  { id: 'journal', label: 'Journal' },
+]
+
+const view = ref<View>('brief')
 const target = ref('')
 const selectedFinding = ref<Finding | null>(null)
+const enrollCommand = ref<string | null>(null)
 const copied = ref(false)
 const scanning = computed(() => status.value === 'running')
-const enrollCommand = ref<string | null>(null)
 
 let agentTimer: ReturnType<typeof setInterval> | undefined
 
@@ -21,85 +31,23 @@ onMounted(() => {
 onBeforeUnmount(() => clearInterval(agentTimer))
 
 const findings = computed<Finding[]>(() => scan.value?.findings ?? [])
-const isOpen = (finding: Finding) => (finding.triage_status ?? 'open') === 'open'
-const openFindings = computed(() => findings.value.filter(isOpen))
 const noResponse = computed(() => scan.value?.status === 'no_response')
-const score = computed(() => scan.value?.score ?? null)
-const animatedScore = useAnimatedNumber(score)
-
-const severityCount = (severity: string) =>
-  openFindings.value.filter((finding) => finding.severity?.toLowerCase() === severity).length
-
-const tally = computed(() =>
-  ['critical', 'high', 'medium', 'low'].map((severity) => ({ severity, count: severityCount(severity) })),
-)
-
-const verdict = computed(() => {
-  if (!scan.value) return 'No reading'
-  if (noResponse.value) return 'No response'
-  if (score.value === null) return 'Not scored'
-  if (score.value >= 80) return 'Contained'
-  if (score.value >= 60) return 'Watch'
-  return 'At risk'
-})
-
-const verdictAlarm = computed(() => score.value !== null && score.value < 60)
-
-const summary = computed(() => {
-  if (!scan.value) return 'No exposure reading yet. Run a scan to take the first one.'
-  if (noResponse.value) return 'No port answered. The target is down or fully filtered, so nothing was observed. This is not a clean result.'
-  const coverage = scan.value.coverage
-  const opened = coverage?.ports_open ?? scan.value.open_ports?.length ?? 0
-  const urgent = severityCount('critical') + severityCount('high')
-  const reading = coverage?.ports_checked
-    ? `${opened} of ${coverage.ports_checked} common ports accepted a connection.`
-    : `${opened} ports accepted a connection.`
-  const priority = urgent ? ` ${urgent} need${urgent === 1 ? 's' : ''} attention first.` : ''
-  const dismissed = findings.value.length - openFindings.value.length
-  const excluded = dismissed ? ` ${dismissed} dismissed, not counted.` : ''
-  return `${reading}${priority}${excluded}`
-})
-
-const vantage = computed(() => {
-  const value = scan.value?.vantage
-  if (value === 'host') return 'Scanned from the machine itself'
-  if (value === 'container') return 'Scanned from the Docker container'
-  return value ? `Scanned from ${value}` : 'Scan origin not recorded'
-})
 
 const emptyTitle = computed(() => {
-  if (!scan.value) return 'No scan yet'
-  return noResponse.value ? `No response from ${scan.value.target}` : 'Nothing exposed'
+  if (!scan.value) return 'No reading yet.'
+  return noResponse.value ? `No response from ${scan.value.target}.` : 'Nothing answered.'
 })
 
 const emptyText = computed(() => {
-  if (!scan.value) return 'Run a scan to take the first reading.'
-  if (noResponse.value) return 'The target is down or fully filtered.'
-  return openFindings.value.length === findings.value.length
-    ? 'None of the common ports accepted a connection.'
-    : 'Every finding has been dismissed.'
+  if (!scan.value) return 'Run a scan to take the first one.'
+  if (noResponse.value) return 'The target is down, or filters everything.'
+  return 'None of the common ports accepted a connection.'
 })
 
-const firewallWeak = computed(() => ['disabled', 'partial'].includes(hostReport.value?.firewall.status ?? ''))
-const listenersBeyondLoopback = computed(() =>
-  hostReport.value?.listeners.items.filter((listener) => listener.exposure !== 'loopback').length ?? 0,
-)
-
-const vulnerabilityLabel = computed(() => {
-  const report = hostReport.value?.vulnerabilities
-  if (!report) return '—'
-  return {
-    complete: `${report.advisories_found} advisories, ${report.fixable} fixable`,
-    partial: `${report.advisories_found} advisories, ${report.fixable} fixable`,
-    unavailable: 'Unavailable',
-    disabled: 'Lookup off',
-    not_covered: 'Not covered',
-  }[report.status]
-})
-
-const scanLabel = computed(() => {
-  if (scanning.value) return 'Scanning…'
-  return agent.value ? 'Run scan' : 'Scan from Docker'
+const agentLine = computed(() => {
+  if (agent.value) return `Watching ${agent.value.hostname}`
+  if (silentAgent.value) return 'The agent went quiet'
+  return 'Agent not connected'
 })
 
 const startScan = () => runScan(target.value.trim(), dockerTarget)
@@ -128,133 +76,98 @@ const copyCommand = async () => {
 </script>
 
 <template>
-  <div :class="['room', { scanning }]">
-    <header class="bar">
-      <div class="brand">
-        <svg viewBox="-12 -12 24 24" aria-hidden="true">
-          <circle r="11" fill="none" stroke="var(--paper)" stroke-width="1.5" />
-          <polygon points="0,-5 4.8,-1.5 3,4 -3,4 -4.8,-1.5" fill="var(--safelight)" />
-        </svg>
-        AttackLens
-      </div>
+  <div :class="['page', { scanning }]">
+    <header class="masthead">
+      <a class="wordmark" href="/" aria-label="AttackLens, home">Attack<em>Lens</em></a>
 
-      <div class="agent-state" role="status">
-        <span :class="['agent-dot', { online: agent }]" />
-        <span>{{ agent ? `Agent connected · ${agent.hostname}` : silentAgent ? `Agent silent since ${formatDate(silentAgent.silent_since ?? undefined)}` : 'Agent offline' }}</span>
-      </div>
+      <nav aria-label="Views">
+        <button
+          v-for="item in VIEWS"
+          :key="item.id"
+          type="button"
+          :aria-current="view === item.id ? 'page' : undefined"
+          @click="view = item.id"
+        >
+          {{ item.label }}
+        </button>
+      </nav>
 
-      <form class="controls" @submit.prevent="startScan">
-        <label class="target-field">
-          <span class="eyebrow">Target</span>
-          <input
-            v-model="target"
-            :disabled="scanning"
-            :placeholder="agent ? 'this machine' : dockerTarget"
-            aria-label="Scan target"
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </label>
-        <a v-if="scan" class="button" :href="`/api/report${hostReport ? `?target=${encodeURIComponent(hostReport.target)}` : ''}`" target="_blank" rel="noopener">Report</a>
-        <button class="button" type="button" :disabled="scanning" @click="loadAll">Refresh</button>
-        <button class="button primary" type="submit" :disabled="scanning">{{ scanLabel }}</button>
+      <form class="scan" @submit.prevent="startScan">
+        <label for="scan-target">Scan</label>
+        <input
+          id="scan-target"
+          v-model="target"
+          :disabled="scanning"
+          :placeholder="agent ? 'this machine' : dockerTarget"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="shutter" type="submit" :disabled="scanning" :aria-label="scanning ? 'Scanning' : 'Start the scan'" />
       </form>
     </header>
 
-    <div v-if="error" class="notice alert" role="alert">
-      <strong>Something went wrong</strong>
-      <span>{{ error }}</span>
-      <button class="button small" type="button" @click="loadAll">Retry</button>
-    </div>
+    <p v-if="error" class="banner" role="alert">
+      {{ error }}
+      <button class="link" type="button" @click="loadAll">Try again</button>
+    </p>
 
-    <div v-if="!agent" class="notice">
-      <strong>{{ silentAgent ? 'This machine is no longer monitored.' : 'The agent is not running.' }}</strong>
-      <span v-if="enrollCommand">Run this on the other machine: <code>{{ enrollCommand }}</code></span>
-      <span v-else>Launch AttackLens with <code>attacklens start</code>, which runs the agent too. Another machine? Create a one-time code.</span>
-      <button v-if="enrollCommand" class="button small" type="button" @click="copyCommand">{{ copied ? 'Copied' : 'Copy' }}</button>
-      <button v-else class="button small" type="button" @click="prepareEnrollment">Enroll a machine</button>
-    </div>
+    <p v-if="!agent" class="banner">
+      <template v-if="enrollCommand">
+        On the other machine, run <code>{{ enrollCommand }}</code>
+        <button class="link" type="button" @click="copyCommand">{{ copied ? 'Copied' : 'Copy' }}</button>
+      </template>
+      <template v-else>
+        {{ silentAgent ? 'This machine is no longer watched.' : 'Scans run from Docker for now.' }}
+        Launch with <code>attacklens start</code> to see the machine from the inside.
+        <button class="link" type="button" @click="prepareEnrollment">Add another machine</button>
+      </template>
+    </p>
 
     <main>
-      <section class="exposure develop" aria-label="Network exposure">
-        <ApertureDial :score="score" :scanning="scanning" />
-
-        <div class="reading">
-          <span class="eyebrow">Network exposure{{ scan ? ` · ${scan.target}` : '' }}</span>
-
-          <div class="score-line">
-            <span :class="['score', { empty: score === null }]">{{ score === null ? '—' : animatedScore }}</span>
-            <span class="score-unit">/ 100</span>
-            <span :class="['verdict', { alarm: verdictAlarm }]">{{ verdict }}</span>
-          </div>
-
-          <p class="summary" aria-live="polite">{{ scanning ? 'Taking a reading…' : summary }}</p>
-
-          <PortStrip v-if="scan?.port_states" :states="scan.port_states" :services="scan.services ?? []" />
-
-          <p v-if="scan" class="provenance">
-            <span>{{ vantage }}</span>
-            <span>{{ formatDate(scan.completed_at) }}</span>
-            <span v-if="scan.duration_seconds !== undefined">{{ scan.duration_seconds.toFixed(1) }} s</span>
-          </p>
-        </div>
-      </section>
-
-      <dl class="tally develop" style="--i: 1">
-        <div v-for="item in tally" :key="item.severity" :class="{ zero: !item.count }">
-          <dt><SeverityMark :severity="item.severity" labelled /></dt>
-          <dd>{{ item.count }}</dd>
-        </div>
-      </dl>
-
-      <dl v-if="hostReport" class="readouts develop" style="--i: 2">
-        <div>
-          <dt class="eyebrow">Firewall</dt>
-          <dd :class="{ warning: firewallWeak }">{{ hostReport.firewall.status }}</dd>
-        </div>
-        <div>
-          <dt class="eyebrow">Beyond loopback</dt>
-          <dd>{{ listenersBeyondLoopback }} of {{ hostReport.listeners.items.length }} listeners</dd>
-        </div>
-        <div>
-          <dt class="eyebrow">Updates available</dt>
-          <dd>{{ hostReport.outdated_count ?? '—' }} of {{ hostReport.packages.items.length }} programs</dd>
-        </div>
-        <div>
-          <dt class="eyebrow">Known vulnerabilities</dt>
-          <dd>{{ vulnerabilityLabel }}</dd>
-        </div>
-      </dl>
-
-      <AttackPaths class="develop" style="--i: 3" :report="paths" />
-
-      <section class="desk develop" style="--i: 4">
-        <FindingLedger
-          :network="findings"
-          :host="hostReport?.findings ?? []"
-          :host-name="hostReport?.target"
-          :empty-title="emptyTitle"
-          :empty-text="emptyText"
-          @view="selectedFinding = $event"
-        />
-        <ChangesPanel
-          :alerts="alerts"
-          :history="history"
-          :comparison="comparison"
-          :current-scan-id="scan?.scan_id"
-          :exposure="exposure"
-          @compare="compareWith"
-        />
-      </section>
-
-      <RuntimePanel :inventory="inventory" :vulnerabilities="vulnerabilities" :posture="posture" :audit="audit" />
+      <BriefView
+        v-if="view === 'brief'"
+        :scan="scan"
+        :host="hostReport"
+        :paths="paths"
+        :exposure="exposure"
+        :scanning="scanning"
+        :alerts="alerts"
+        @view="selectedFinding = $event"
+      />
+      <FindingLedger
+        v-else-if="view === 'findings'"
+        :network="findings"
+        :host="hostReport?.findings ?? []"
+        :host-name="hostReport?.target"
+        :empty-title="emptyTitle"
+        :empty-text="emptyText"
+        @view="selectedFinding = $event"
+      />
+      <MachineView
+        v-else-if="view === 'machine'"
+        :host="hostReport"
+        :exposure="exposure"
+        :inventory="inventory"
+        :posture="posture"
+        :vulnerabilities="vulnerabilities"
+      />
+      <JournalView
+        v-else
+        :alerts="alerts"
+        :audit="audit"
+        :history="history"
+        :comparison="comparison"
+        :current-scan-id="scan?.scan_id"
+        @compare="compareWith"
+      />
     </main>
 
-    <FindingDrawer :finding="selectedFinding" @close="selectedFinding = null" @decide="decide" />
-
     <footer>
-      <span>AttackLens</span>
-      <span>Listening on an interface does not prove a service is reachable from other machines.</span>
+      <span class="agent-line" role="status">{{ agentLine }}</span>
+      <a v-if="scan" :href="`/api/report${hostReport ? `?target=${encodeURIComponent(hostReport.target)}` : ''}`" target="_blank" rel="noopener">Printable report</a>
+      <button class="link" type="button" @click="loadAll">Refresh</button>
     </footer>
+
+    <FindingDrawer :finding="selectedFinding" @close="selectedFinding = null" @decide="decide" />
   </div>
 </template>
