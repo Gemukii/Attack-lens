@@ -105,6 +105,7 @@ export interface HostReport extends ScanResults {
     status: 'complete' | 'partial' | 'unavailable' | 'disabled' | 'not_covered'
     packages_checked: number
     advisories_found: number
+    fixable: number
   }
 }
 

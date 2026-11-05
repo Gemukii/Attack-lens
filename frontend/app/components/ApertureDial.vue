@@ -91,7 +91,8 @@ const label = computed(() =>
 let frame = 0
 let startedAt = 0
 
-const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+// A hidden page gets no animation frames: the iris must still match the data.
+const reducedMotion = () => document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const animate = (now: number) => {
   const target = openingFor(props.score)
@@ -127,9 +128,15 @@ const wake = () => {
   }
 }
 
-onMounted(wake)
+onMounted(() => {
+  wake()
+  document.addEventListener('visibilitychange', wake)
+})
 watch(() => [props.score, props.scanning], wake)
-onBeforeUnmount(() => cancelAnimationFrame(frame))
+onBeforeUnmount(() => {
+  cancelAnimationFrame(frame)
+  document.removeEventListener('visibilitychange', wake)
+})
 </script>
 
 <template>

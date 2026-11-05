@@ -93,14 +93,21 @@ def _normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def _fixed_versions(advisory: dict[str, Any], package: str) -> list[str]:
-    """Return the versions fixing this advisory for this package only."""
+def _fixed_versions(advisory: dict[str, Any], package: str, ecosystem: str) -> list[str]:
+    """Return the versions fixing this advisory for this package, in this ecosystem.
+
+    One advisory covers several releases of a distribution. A fix published for Debian 14
+    cannot be installed on Debian 13, so it must not be offered there.
+    """
     fixed: set[str] = set()
     for affected in advisory.get("affected", []):
         if not isinstance(affected, dict):
             continue
-        affected_name = (affected.get("package") or {}).get("name")
+        affected_package = affected.get("package") or {}
+        affected_name = affected_package.get("name")
         if affected_name and _normalize(affected_name) != _normalize(package):
+            continue
+        if affected_package.get("ecosystem", ecosystem) != ecosystem:
             continue
         for version_range in affected.get("ranges", []):
             if not isinstance(version_range, dict):
@@ -141,11 +148,14 @@ def _severity(advisory: dict[str, Any]) -> tuple[str | None, str | None]:
 
 
 def _map_advisory(
-    reference: dict[str, Any], advisory: dict[str, Any] | None, package: dict[str, str]
+    reference: dict[str, Any],
+    advisory: dict[str, Any] | None,
+    package: dict[str, str],
+    ecosystem: str,
 ) -> dict[str, Any]:
     """Build a report entry, keeping the identifier when details are missing."""
     details = advisory or {}
-    fixed_versions = _fixed_versions(details, package["name"])
+    fixed_versions = _fixed_versions(details, package["name"], ecosystem)
     next_fix = _next_fixed_version(fixed_versions, package["version"])
     severity, cvss_vector = _severity(details)
     references = [
@@ -218,7 +228,7 @@ def query_package_vulnerabilities(
         "packages_checked": len(checked_packages),
         "advisories_found": len(matches),
         "vulnerabilities": [
-            _map_advisory(reference, advisory, package)
+            _map_advisory(reference, advisory, package, ecosystem)
             for (package, reference), advisory in zip(selected, advisories, strict=True)
         ],
     }

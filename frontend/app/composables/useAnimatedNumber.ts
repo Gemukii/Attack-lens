@@ -1,11 +1,14 @@
-// Counts towards a value, unless the visitor asked for reduced motion.
+// Counts towards a value, unless the visitor asked for reduced motion. A hidden page gets
+// no animation frames, so it takes the value at once: the display must never stay wrong.
 export const useAnimatedNumber = (source: Ref<number | null>, duration = 1100) => {
   const value = ref(0)
   let frame = 0
+  let fallback: ReturnType<typeof setTimeout> | undefined
 
   const run = (to: number) => {
     cancelAnimationFrame(frame)
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    clearTimeout(fallback)
+    if (document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       value.value = to
       return
     }
@@ -18,6 +21,11 @@ export const useAnimatedNumber = (source: Ref<number | null>, duration = 1100) =
       if (progress < 1) frame = requestAnimationFrame(step)
     }
     frame = requestAnimationFrame(step)
+    // Frames stop if the page gets hidden mid-count: land on the value regardless.
+    fallback = setTimeout(() => {
+      cancelAnimationFrame(frame)
+      value.value = to
+    }, duration + 200)
   }
 
   onMounted(() => {
@@ -25,7 +33,10 @@ export const useAnimatedNumber = (source: Ref<number | null>, duration = 1100) =
       if (to !== null) run(to)
     }, { immediate: true })
   })
-  onBeforeUnmount(() => cancelAnimationFrame(frame))
+  onBeforeUnmount(() => {
+    cancelAnimationFrame(frame)
+    clearTimeout(fallback)
+  })
 
   return value
 }

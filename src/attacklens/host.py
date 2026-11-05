@@ -416,6 +416,11 @@ def vulnerability_findings(target: str, report: dict[str, Any]) -> list[Finding]
         Finding(
             category="vulnerability",
             severity=item["severity"] if item["severity"] in severities else "medium",
+            risk_reason=(
+                ""
+                if item["severity"] in severities
+                else "The advisory gives no severity label: medium is assumed."
+            ),
             title=f"{item['id']} in {item['package']}",
             description=item["summary"] or "See the advisory.",
             evidence=f"{item['package']} {item['version']}",
@@ -474,6 +479,9 @@ def collect_host_report() -> dict[str, Any]:
                 "status": vulnerabilities["status"],
                 "packages_checked": vulnerabilities["packages_checked"],
                 "advisories_found": vulnerabilities.get("advisories_found", 0),
+                "fixable": sum(
+                    bool(item["fixed_versions"]) for item in vulnerabilities["vulnerabilities"]
+                ),
             },
         },
     )

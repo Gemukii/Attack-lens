@@ -94,6 +94,31 @@ def test_fix_versions_belong_to_the_checked_package(osv) -> None:
     assert entry["remediation"] == "Upgrade example-package to version 1.2.4 or newer."
 
 
+def test_fix_of_another_release_is_not_offered(osv) -> None:
+    """Real shape of a Debian advisory: fixed in Debian 14, still open in Debian 13."""
+    osv.advisories[ADVISORY["id"]] = {
+        **ADVISORY,
+        "affected": [
+            {
+                "package": {"name": "acl", "ecosystem": "Debian:13"},
+                "ranges": [{"events": [{"introduced": "0"}]}],
+            },
+            {
+                "package": {"name": "acl", "ecosystem": "Debian:14"},
+                "ranges": [{"events": [{"introduced": "0"}, {"fixed": "2.4.0-1"}]}],
+            },
+        ],
+    }
+    packages = [{"name": "acl", "version": "2.3.2-2+b1"}]
+
+    on_trixie = vulnerabilities.query_package_vulnerabilities(packages, ecosystem="Debian:13")
+    on_forky = vulnerabilities.query_package_vulnerabilities(packages, ecosystem="Debian:14")
+
+    assert on_trixie["vulnerabilities"][0]["fixed_versions"] == []
+    assert "latest secure version" in on_trixie["vulnerabilities"][0]["remediation"]
+    assert on_forky["vulnerabilities"][0]["fixed_versions"] == ["2.4.0-1"]
+
+
 def test_remediation_targets_the_fix_above_the_installed_version(osv) -> None:
     """A fix older than the installed version would be useless advice."""
     packages = [{"name": "example-package", "version": "2.0.0"}]

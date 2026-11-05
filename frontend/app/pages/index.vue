@@ -89,8 +89,8 @@ const vulnerabilityLabel = computed(() => {
   const report = hostReport.value?.vulnerabilities
   if (!report) return '—'
   return {
-    complete: `${report.advisories_found} advisories`,
-    partial: `${report.advisories_found} advisories`,
+    complete: `${report.advisories_found} advisories, ${report.fixable} fixable`,
+    partial: `${report.advisories_found} advisories, ${report.fixable} fixable`,
     unavailable: 'Unavailable',
     disabled: 'Lookup off',
     not_covered: 'Not covered',

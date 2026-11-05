@@ -289,6 +289,7 @@ def test_vulnerability_findings_keep_actionable_advisories() -> None:
 
     assert len(findings) == 1
     assert findings[0].severity == "medium"
+    assert "assumed" in findings[0].risk_reason
     assert findings[0].category == "vulnerability"
 
 
