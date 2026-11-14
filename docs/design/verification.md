@@ -21,12 +21,12 @@ machine that made them. The same holds for the image folders named in `audit.md`
 
 | Check | Result |
 | --- | --- |
-| Unit tests | 72 pass |
+| Unit tests | 75 pass |
 | Production build | Succeeds; no demo string in `.output` |
 | Layout shift on load | 0 at 390, 0 to 0.0001 at 1440, in the six scenarios |
 | Layout shift through a session (hover, tabs, drawer, scan, copy) | 0 at 390 and at 1440 when the scan brings nothing new. 0.004 at 1440 when it adds a service: the bench gains a row and what is under it moves. This is new data arriving, and it stays far under the 0.1 that counts as a poor score, but it is not zero |
 | Horizontal overflow at 390 | None, on the four views of the six scenarios |
-| Contrast, WCAG AA | Lowest 5.66 over 3,142 rendered texts (4.5 required). Lowest case: muted text on a hovered row |
+| Contrast, WCAG AA | Lowest 5.66 over 3,144 rendered texts (4.5 required). Lowest case: muted text on a hovered row |
 | Keyboard | Every stop shows a focus ring: 20 on the brief, 26 on findings, 10 on the machine, 13 on the journal |
 | Target size | No control under 24 px, except "Show them", a link inside a sentence (WCAG 2.2 exempts it) |
 | Reduced motion | No view transition starts, no indicator animates, the field is still |
@@ -147,7 +147,7 @@ finding:
 | S6 | The scan field shows another address than the target | Not fixed: the placeholder comes from the runtime configuration, and the mismatch is an effect of the demo fixtures |
 | S7 | One marketing sentence and one vague note in the verdict | Fixed: "Each confirmed one has evidence behind it." and "Checked by an outside probe" |
 | S8 | The empty state still drew a field | Fixed: with nothing read, the bench gives way to one line. Scan stays enabled while the API is down, since it is also how one tries again |
-| S9 | The field is hard to read at 390 px | Left open: a list of rays under 640 px is a design decision |
+| S9 | The field is hard to read at 390 px | Fixed after the review. Under 640 px the bench is a list: one line per service, with the stroke it has in the picture and its state in words, then the three stations. The picture takes over again when the window widens |
 | S10 | The journal did not say what each decision was about | Fixed: each line carries its subject, and the heading is "Audit log", since backups and scans are in it. The author is not shown: every entry of the fixtures is "dashboard" or "api" |
 | S11 | The backdrop of the login and error pages is at full contrast | Kept on purpose: it is the look that was asked for |
 
@@ -156,4 +156,3 @@ finding:
 - **Videos.** Replaced by the contact sheets above.
 - **The check scripts are not in the repository.** They need `playwright-core`, which is not a
   dependency of the project. Adding them is a decision to take.
-- **The bench on a phone** is dense: seven rays in 358 px. It is readable, not comfortable.

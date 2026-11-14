@@ -10,7 +10,7 @@ import SeverityMark from '~/components/SeverityMark.vue'
 import ReadingLine from '~/components/ReadingLine.vue'
 import type { Agent, Alert, AttackPathReport, Finding, HostReport, ScanResults } from '~/types/scan'
 import { glyph, tint } from '~/utils/ascii'
-import { buildBench, describeRay, isProvedWay, waysNotDrawn } from '~/utils/bench'
+import { benchStations, buildBench, describeRay, isProvedWay, rayStateText, rayTrace, waysNotDrawn } from '~/utils/bench'
 import { countWaysIn, pickActions, scoreTrend, writeBrief } from '~/utils/brief'
 import { byRisk, firstSeen, isOpen, proofLabel, splitHostFindings, uniqueByPort } from '~/utils/findings'
 import { ago, formatDate } from '~/utils/format'
@@ -197,6 +197,42 @@ describe('the optical bench', () => {
     expect(wrapper.text()).toContain('Full control')
     await wrapper.find('.glyph-ray').trigger('click')
     expect((wrapper.emitted('select')?.[0]?.[0] as { finding: Finding }).finding.finding_id).toBe(item.finding_id)
+  })
+
+  it('lists the same rays for a phone, each with its stroke and its state in words', async () => {
+    const redis = finding({ finding_id: 'redis', port: 6379, service: 'Redis', reachability: 'exposed', risk: risk(60, 'now') })
+    const smb = finding({ finding_id: 'smb', port: 445, service: 'SMB', reachability: 'shielded', risk: risk(40) })
+    const bench = buildBench([redis, smb], [], host, paths(['p'], 'confirmed', ['redis']))
+    const wrapper = mount(GlyphBench, { props: { bench, highlight: 'smb' } })
+    const rows = wrapper.findAll('.ray-list button.ray')
+
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.text()).toContain('Redis')
+    expect(rows[0]?.find('.ray-state').text()).toBe('Proved way to full control')
+    expect(rows[0]?.find('.ray-state').classes()).toContain('text-alert')
+    expect(rows[0]?.find('.ray-trace').classes()).toContain('field-hot-3')
+    expect(rows[1]?.find('.ray-state').text()).toBe('Blocked before this machine')
+    expect(rows[1]?.classes()).toContain('linked')
+    expect(wrapper.find('.stations').text()).toContain('2 listed')
+    await rows[1]?.trigger('click')
+    expect((wrapper.emitted('select')?.[0]?.[0] as { finding: Finding }).finding.finding_id).toBe('smb')
+  })
+
+  it('says the state of a ray in words, and never calls an unproved one proved', () => {
+    expect(rayStateText({ state: 'proved', reaches: true })).toBe('Proved way to full control')
+    expect(rayStateText({ state: 'proved', reaches: false })).toBe('Reachable, no known path beyond')
+    expect(rayStateText({ state: 'unproved', reaches: true })).toBe('Not proved yet, would lead to full control')
+    expect(rayStateText({ state: 'unproved', reaches: false })).toBe('Not proved yet')
+    expect(rayStateText({ state: 'stopped', reaches: false })).toBe('Blocked before this machine')
+    expect(rayTrace({ state: 'unproved', reaches: true }).tone).not.toMatch(/hot/)
+  })
+
+  it('says not measured for a station that was not, and flags a firewall that is off', () => {
+    const unknown = benchStations(buildBench([], [], null, null, false))
+    const off = benchStations(buildBench([], [], { firewall: { status: 'disabled', source: 'windows' } } as HostReport, null))
+
+    expect(unknown.map((station) => station.value)).toEqual(['Not measured', 'Not read yet', 'Not measured'])
+    expect(off[0]).toMatchObject({ value: 'Off', alert: true })
   })
 
   it('reads a ray aloud on hover', async () => {

@@ -2,8 +2,8 @@
 import type { FieldTone } from '~/utils/ascii'
 import { FIELD_HOT_TONES, FIELD_TONES } from '~/utils/ascii'
 import type { Bench, Ray } from '~/utils/bench'
-import { describeRay } from '~/utils/bench'
-import type { FieldLabel, GlyphField } from '~/utils/glyphField'
+import { benchStations, describeRay, isProvedWay, rayStateText, rayTrace } from '~/utils/bench'
+import type { FieldLabel } from '~/utils/glyphField'
 import { buildGlyphField, renderGlyphLines } from '~/utils/glyphField'
 import { motionDuration, tokenColour } from '~/utils/motion'
 
@@ -17,6 +17,9 @@ import { motionDuration, tokenColour } from '~/utils/motion'
 //
 // The still picture is text, rendered by the server. Once in the browser the same picture
 // is painted on a canvas laid over it, so that a frame never moves anything in the page.
+//
+// On a phone the picture cannot be read: seven rays do not fit in 360 px. The same rays are
+// then a list, one line each, with the stroke of the legend and the state in words.
 const props = withDefaults(defineProps<{
   bench: Bench
   // A ray pointed at from elsewhere in the page, for example from the list of actions.
@@ -31,24 +34,15 @@ const emit = defineEmits<{
   point: [ray: Ray | null]
 }>()
 
-type LayoutId = 'wide' | 'narrow'
-
-// Two widths: the columns always fit their container, and a phone gets fewer of them.
-const WIDE_COLUMNS = 138
-const NARROW_COLUMNS = 52
-const NARROW_SCREEN = '(max-width: 640px)'
+const COLUMNS = 138
 // Few frames on purpose: characters change in place, they do not slide.
 const FRAMES_PER_SECOND = 12
 // A cell is 0.6 of the type size wide and 1.1 high, as in the stylesheet.
 const CELL_WIDTH = 0.6
 const CELL_HEIGHT = 1.1
 
-const wide = computed(() => buildGlyphField(props.bench, WIDE_COLUMNS, false))
-const narrow = computed(() => buildGlyphField(props.bench, NARROW_COLUMNS, true))
-const layouts = computed<Array<{ id: LayoutId; field: GlyphField }>>(() => [
-  { id: 'wide', field: wide.value },
-  { id: 'narrow', field: narrow.value },
-])
+const field = computed(() => buildGlyphField(props.bench, COLUMNS, false))
+const stations = computed(() => benchStations(props.bench))
 
 const hovered = ref<Ray | null>(null)
 const note = computed(() => {
@@ -57,7 +51,7 @@ const note = computed(() => {
 })
 
 const root = ref<HTMLElement | null>(null)
-const canvases = ref<Partial<Record<LayoutId, HTMLCanvasElement>>>({})
+const canvas = ref<HTMLCanvasElement | null>(null)
 // True once the canvas has taken over from the text.
 const painted = ref(false)
 
@@ -70,29 +64,24 @@ let inView = true
 // Seconds for light to cross the picture, and ms for the picture to develop. Zero means still.
 let flow = 0
 let develop = 0
-let narrowScreen = false
 let watcher: IntersectionObserver | undefined
 let resizer: ResizeObserver | undefined
-let screen: MediaQueryList | undefined
 
-const current = () => (narrowScreen ? { id: 'narrow' as LayoutId, field: narrow.value } : { id: 'wide' as LayoutId, field: wide.value })
-
-// Paints one moment of the layout that is on screen. Returns false when there is no canvas to paint on.
+// Paints one moment. Returns false when there is nothing to paint on: no canvas yet, or a
+// phone, where the picture is not shown.
 const paint = (now: number) => {
-  const { id, field } = current()
-  const canvas = canvases.value[id]
-  const box = canvas?.parentElement
-  const context = canvas?.getContext('2d')
-  if (!canvas || !box || !context) return false
+  const box = canvas.value?.parentElement
+  const context = canvas.value?.getContext('2d')
+  if (!canvas.value || !box || !context) return false
 
   const width = box.clientWidth
   if (!width) return false
-  const cell = width / (field.cols * CELL_WIDTH)
-  const height = field.rows * cell * CELL_HEIGHT
+  const cell = width / (field.value.cols * CELL_WIDTH)
+  const height = field.value.rows * cell * CELL_HEIGHT
   const ratio = Math.min(window.devicePixelRatio || 1, 2)
-  if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
-    canvas.width = Math.round(width * ratio)
-    canvas.height = Math.round(height * ratio)
+  if (canvas.value.width !== Math.round(width * ratio) || canvas.value.height !== Math.round(height * ratio)) {
+    canvas.value.width = Math.round(width * ratio)
+    canvas.value.height = Math.round(height * ratio)
   }
   context.setTransform(ratio, 0, 0, ratio, 0, 0)
   context.clearRect(0, 0, width, height)
@@ -100,9 +89,9 @@ const paint = (now: number) => {
   context.textBaseline = 'middle'
 
   const elapsed = now - started
-  const lines = renderGlyphLines(field, {
+  const lines = renderGlyphLines(field.value, {
     time: flow ? elapsed / 1000 : undefined,
-    speed: flow ? field.width / flow : undefined,
+    speed: flow ? field.value.width / flow : undefined,
     highlight: hovered.value?.id ?? props.highlight,
     reveal: develop && elapsed < develop ? elapsed / develop : undefined,
   })
@@ -132,13 +121,19 @@ const loop = (now: number) => {
 // Runs the loop while the picture can be seen and may move. Otherwise it is painted once.
 const run = () => {
   cancelAnimationFrame(frame)
+  if (!painted.value) return
   if (flow && inView && !document.hidden) frame = requestAnimationFrame(loop)
-  else if (painted.value) paint(performance.now())
+  else paint(performance.now())
 }
 
-const onScreenChange = (event: MediaQueryListEvent) => {
-  narrowScreen = event.matches
-  paint(performance.now())
+// The picture may not be on screen when the page arrives (a phone shows the list), and
+// come later when the window widens: it develops the first time it can be painted.
+const show = () => {
+  const now = performance.now()
+  if (!painted.value) started = now
+  if (!paint(now) || painted.value) return
+  painted.value = true
+  run()
 }
 
 onMounted(async () => {
@@ -149,14 +144,9 @@ onMounted(async () => {
   flow = motionDuration('--dur-flow') / 1000
   // What happens once lasts 400 ms at most: the entrance takes the slow duration, no more.
   develop = motionDuration('--dur-slow')
-  screen = window.matchMedia(NARROW_SCREEN)
-  narrowScreen = screen.matches
-  screen.addEventListener?.('change', onScreenChange)
-  started = performance.now()
-  painted.value = paint(started)
-  if (!painted.value) return
+  show()
 
-  resizer = new ResizeObserver(() => paint(performance.now()))
+  resizer = new ResizeObserver(show)
   resizer.observe(root.value)
   if (typeof IntersectionObserver !== 'undefined') {
     watcher = new IntersectionObserver(([entry]) => {
@@ -166,11 +156,10 @@ onMounted(async () => {
     watcher.observe(root.value)
   }
   document.addEventListener('visibilitychange', run)
-  run()
 })
 
 // New data, or a ray pointed at: the picture is painted again at once, moving or not.
-watch([wide, narrow, hovered, () => props.highlight], () => {
+watch([field, hovered, () => props.highlight], () => {
   if (painted.value) paint(performance.now())
 })
 
@@ -187,30 +176,24 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(frame)
   watcher?.disconnect()
   resizer?.disconnect()
-  screen?.removeEventListener?.('change', onScreenChange)
   document.removeEventListener('visibilitychange', run)
 })
 
 const place = (label: FieldLabel) => ({ '--r': label.row, '--c': label.col })
-const setCanvas = (id: LayoutId) => (element: unknown) => {
-  if (element) canvases.value[id] = element as HTMLCanvasElement
-}
 </script>
 
 <template>
   <figure ref="root" :class="['glyph-bench', { painted, scanning }]">
     <div
-      v-for="layout in layouts"
-      :key="layout.id"
-      :class="['glyph-field', `only-${layout.id}`]"
+      class="glyph-field only-wide"
       role="group"
-      :aria-label="layout.field.summary"
-      :style="{ '--cols': layout.field.cols, '--rows': layout.field.rows }"
+      :aria-label="field.summary"
+      :style="{ '--cols': field.cols, '--rows': field.rows }"
     >
       <div class="glyph-field-wrap">
-        <pre aria-hidden="true"><template v-for="(line, row) in layout.field.lines" :key="row"><span v-for="(run, index) in line" :key="index" :class="run.tone">{{ run.text }}</span>{{ '\n' }}</template></pre>
-        <canvas :ref="setCanvas(layout.id)" aria-hidden="true" />
-        <template v-for="(label, index) in layout.field.labels" :key="index">
+        <pre aria-hidden="true"><template v-for="(line, row) in field.lines" :key="row"><span v-for="(run, index) in line" :key="index" :class="run.tone">{{ run.text }}</span>{{ '\n' }}</template></pre>
+        <canvas ref="canvas" aria-hidden="true" />
+        <template v-for="(label, index) in field.labels" :key="index">
           <button
             v-if="label.ray"
             type="button"
@@ -229,6 +212,41 @@ const setCanvas = (id: LayoutId) => (element: unknown) => {
         </template>
       </div>
     </div>
-    <figcaption class="t-body-s" aria-live="polite">{{ note }}</figcaption>
+
+    <!-- On a phone: the same rays as a list. Each keeps the stroke it has in the picture. -->
+    <div class="ray-list only-narrow" role="group" :aria-label="field.summary">
+      <ul v-if="bench.rays.length || bench.side.length" class="rays">
+        <li v-for="(ray, index) in bench.rays" :key="ray.id" :style="{ '--i': index }">
+          <button
+            type="button"
+            :class="['ray', { linked: ray.id === highlight }]"
+            :aria-label="describeRay(ray)"
+            @click="emit('select', ray)"
+          >
+            <span class="ray-name"><b>{{ ray.label }}</b><i>{{ ray.port }}</i></span>
+            <span :class="['ray-trace', rayTrace(ray).tone]" aria-hidden="true">{{ rayTrace(ray).text }}</span>
+            <span :class="['ray-state t-body-s', { 'text-alert': isProvedWay(ray) }]">{{ rayStateText(ray) }}</span>
+          </button>
+        </li>
+        <li v-for="(side, index) in bench.side" :key="side.id" :style="{ '--i': bench.rays.length + index }">
+          <p class="ray">
+            <span class="ray-name"><b>{{ side.label }}</b></span>
+            <span class="ray-trace field-3" aria-hidden="true">· · *</span>
+            <span class="ray-state t-body-s">Leads to full control, not through the network</span>
+          </p>
+        </li>
+      </ul>
+      <dl class="stations">
+        <div v-for="station in stations" :key="station.label">
+          <dt class="t-label">{{ station.label }}</dt>
+          <dd :class="['t-body-s', { 'text-alert': station.alert }]">{{ station.value }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <figcaption class="t-body-s" aria-live="polite">
+      <span class="only-wide">{{ note }}</span>
+      <span class="only-narrow">{{ bench.rays.length ? 'Each line is a service. Select it for the detail.' : 'No service listed yet.' }}</span>
+    </figcaption>
   </figure>
 </template>

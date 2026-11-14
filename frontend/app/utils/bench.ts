@@ -83,6 +83,39 @@ export const buildBench = (
 // It is the only thing on the bench drawn in the accent.
 export const isProvedWay = (ray: Pick<Ray, 'state' | 'reaches'>) => ray.reaches && ray.state === 'proved'
 
+// On a phone a ray is one line of a list. It keeps the stroke it has in the picture and in
+// the legend, and its state is said in a few words.
+export const rayTrace = (ray: Pick<Ray, 'state' | 'reaches'>): { text: string; tone: string } => {
+  if (isProvedWay(ray)) return { text: '####', tone: 'field-hot-3' }
+  if (ray.state === 'proved') return { text: '====', tone: 'field-3' }
+  if (ray.state === 'stopped') return { text: '---+', tone: 'field-2' }
+  return { text: '-- --', tone: 'field-2' }
+}
+
+export const rayStateText = (ray: Pick<Ray, 'state' | 'reaches'>) => {
+  if (isProvedWay(ray)) return 'Proved way to full control'
+  if (ray.state === 'stopped') return 'Blocked before this machine'
+  if (ray.state === 'proved') return 'Reachable, no known path beyond'
+  return ray.reaches ? 'Not proved yet, would lead to full control' : 'Not proved yet'
+}
+
+// The three stations of the bench, in words.
+export interface Station {
+  label: string
+  value: string
+  alert: boolean
+}
+
+export const benchStations = (bench: Bench): Station[] => {
+  const known = ['enabled', 'partial', 'disabled'].includes(bench.firewall)
+  const on = ['enabled', 'partial'].includes(bench.firewall)
+  return [
+    { label: 'Firewall', value: known ? (on ? 'On' : 'Off') : 'Not measured', alert: known && !on },
+    { label: 'Services', value: bench.services === null ? 'Not read yet' : `${bench.rays.length} listed`, alert: false },
+    { label: 'Your account', value: bench.admin === null ? 'Not measured' : bench.admin ? 'Administrator' : 'Standard user', alert: false },
+  ]
+}
+
 // Ways in that do not go through the network cannot be drawn as rays: they are named instead.
 export const waysNotDrawn = (paths: AttackPathReport | null): string[] =>
   (paths?.paths ?? [])

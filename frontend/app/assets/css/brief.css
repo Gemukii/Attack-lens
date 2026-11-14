@@ -133,6 +133,35 @@
 .glyph-ray i { color: var(--fg-muted); font-family: var(--font-mono); font-size: var(--font-size-label); font-style: normal; }
 .glyph-ray::before { position: absolute; inset: calc(var(--space-2) * -1) calc(var(--space-2) * -1); content: ""; }
 
+/* On a phone the bench is a list: one ray per line, with its stroke and its state. */
+.rays li { border-bottom: var(--border-width) solid var(--border-subtle); }
+
+.ray {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-half) var(--space-3);
+  width: 100%;
+  min-height: calc(var(--size-row) + var(--space-3));
+  padding: var(--space-2) 0;
+}
+
+button.ray:hover,
+.ray.linked { background: var(--color-bg-row-hover); }
+button.ray:active { background: var(--color-bg-row-pressed); }
+.ray-name { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.ray-name b { font-weight: var(--font-weight-medium); }
+.ray-name i { color: var(--fg-muted); font-family: var(--font-mono); font-size: var(--font-size-label); font-style: normal; }
+.ray-trace { font-family: var(--font-mono); font-size: var(--font-size-body-s); white-space: pre; transition: opacity var(--dur-slow) var(--ease-in-out); }
+.ray-state { grid-column: 1 / -1; color: var(--fg-secondary); }
+.ray-state.text-alert { color: var(--accent-fg); }
+.glyph-bench.scanning .ray-trace { opacity: var(--opacity-bench-scanning); }
+
+.stations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding-top: var(--space-4); }
+.stations div { display: grid; gap: var(--space-half); }
+.stations dd { color: var(--fg-secondary); }
+.stations dd.text-alert { color: var(--accent-fg); }
+
 /* Below the hero */
 
 .actions li { border-bottom: var(--border-width) solid var(--border-subtle); }
@@ -226,6 +255,7 @@
 @media (max-width: 640px) {
   .only-wide { display: none; }
   .only-narrow { display: block; }
+  .glyph-bench figcaption .only-narrow { display: inline; }
   .hero { padding-bottom: var(--space-6); }
   .action { grid-template-columns: var(--space-6) minmax(0, 1fr); }
   .action .severity { grid-column: 2; }

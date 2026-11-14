@@ -212,7 +212,7 @@ watch(() => props.scan?.scan_id, (id, previous) => {
       <section class="hero-bench span-8" aria-labelledby="bench-title">
         <header class="section-head">
           <h2 id="bench-title" class="t-label">From the network to full control</h2>
-          <ul v-if="bench.rays.length" class="legend t-body-s" aria-label="Legend">
+          <ul v-if="bench.rays.length" class="legend only-wide t-body-s" aria-label="Legend">
             <li><span class="swatch field-hot-3" aria-hidden="true">####</span>Proved way to full control</li>
             <li><span class="swatch field-3" aria-hidden="true">====</span>Proved from outside</li>
             <li><span class="swatch field-2" aria-hidden="true">-- --</span>Not proved yet</li>
@@ -226,10 +226,10 @@ watch(() => props.scan?.scan_id, (id, previous) => {
         </p>
         <p v-if="notDrawn.length" class="t-body-s text-muted bench-note">
           {{ notDrawn.length === 1 ? 'One more way in does' : `${notDrawn.length} more ways in do` }} not go through the network, so
-          {{ notDrawn.length === 1 ? 'it is' : 'they are' }} not drawn: {{ notDrawn.map((title) => title.charAt(0).toLowerCase() + title.slice(1)).join('; ') }}.
+          {{ notDrawn.length === 1 ? 'it is' : 'they are' }} not shown here: {{ notDrawn.map((title) => title.charAt(0).toLowerCase() + title.slice(1)).join('; ') }}.
         </p>
         <p v-if="hidden" class="t-body-s text-muted bench-note">
-          {{ answering }} services answer, {{ bench.rays.length }} are drawn.
+          {{ answering }} services answer, {{ bench.rays.length }} are shown.
           <template v-if="quietServices">{{ quietServices === 1 ? 'One has' : `${quietServices} have` }} no open finding, dismissed or with nothing found.</template>
           <template v-if="beyond">{{ beyond === 1 ? 'One more is' : `${beyond} more are` }} in the findings: the picture stops at seven.</template>
         </p>

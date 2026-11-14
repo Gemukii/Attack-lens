@@ -291,6 +291,7 @@ code { font-family: var(--font-mono); font-size: var(--font-size-code-inline); }
 .segment,
 .views button,
 .row,
+.ray,
 .action,
 .first-action,
 .glyph-ray,
@@ -333,6 +334,7 @@ button.row:hover .row-title,
 
 /* On first display the rows arrive one after the other, the whole in under 300 ms. */
 .rows > li,
+.rays > li,
 .actions > li,
 .timeline > li,
 .log > li,

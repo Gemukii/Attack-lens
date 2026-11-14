@@ -77,6 +77,11 @@ Question: **by which route does the network reach full control, and where is eac
 | On demand | The detail of a ray | Opens the finding |
 | Hidden | Rays beyond seven | Replaced by a count and a link to the findings |
 
+On a phone the bench is not a picture: seven rays do not fit in 360 px. The same rays are a list,
+in the order of risk, each with the stroke of the legend and its state in words ("Proved way to full
+control", "Blocked before this machine", "Not proved yet"), followed by the state of the three
+stations. The legend is not shown there, since every line says what it is.
+
 The height follows the number of rays instead of staying between 400 and 540 px. With nothing
 measured the bench is not drawn empty: it gives way to one line saying that no service has been read.
 
