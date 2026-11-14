@@ -70,3 +70,15 @@ logs/
 # fichier results 
 /results
 /backups
+
+# Temporary files
+.claude/
+/.claude
+
+# Design work
+# Captures, contact sheets, measurements and prototypes stay on the machine that made
+# them. Only the written documents are versioned: every .md file under docs/design.
+
+docs/design/**
+!docs/design/**/
+!docs/design/**/*.md

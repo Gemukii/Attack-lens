@@ -1,0 +1,166 @@
+{
+  "id": "clear",
+  "label": "Agent online, no way in",
+  "description": "A hardened workstation: nothing reaches full control, a probe from another machine agrees, only low and informational findings remain, and the score has been stable for weeks.",
+  "extends": "empty",
+  "responses": {
+    "agents": [
+      {
+        "hostname": "desk-12",
+        "platform": "Windows-11-10.0.22631",
+        "version": "0.1.0",
+        "address": "198.51.100.22",
+        "last_seen": "@-0m",
+        "online": true,
+        "silent_since": null
+      }
+    ],
+    "results": {
+      "scan_id": "demo-clear-06",
+      "target": "desk-12.example.com",
+      "scan_type": "network",
+      "status": "complete",
+      "completed_at": "@-20m",
+      "duration_seconds": 3.9,
+      "score": 94,
+      "raw_score": 94,
+      "vantage": "host",
+      "coverage": { "ports_checked": 36, "ports_open": 2, "ports_closed": 34, "ports_filtered": 0 },
+      "open_ports": [135, 445],
+      "findings": [
+        {
+          "finding_id": "demo-clear-135",
+          "target": "desk-12.example.com",
+          "category": "network",
+          "severity": "medium",
+          "title": "MS-RPC service detected",
+          "description": "TCP port 135 is accepting connections.",
+          "evidence": "desk-12.example.com:135/tcp",
+          "remediation": "Block inbound RPC at the firewall except from trusted management hosts.",
+          "risk_reason": "MS-RPC is a frequent entry point for enumeration and lateral movement.",
+          "port": 135,
+          "service": "MS-RPC",
+          "protocol": "tcp",
+          "reachability": "shielded",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.5, "reachability": "shielded", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-clear-445",
+          "target": "desk-12.example.com",
+          "category": "network",
+          "severity": "high",
+          "title": "SMB service detected",
+          "description": "TCP port 445 is accepting connections.",
+          "evidence": "desk-12.example.com:445/tcp",
+          "remediation": "Restrict SMB to trusted networks and block inbound Internet access.",
+          "risk_reason": "SMB exposure can enable file-sharing attacks and lateral movement.",
+          "port": 445,
+          "service": "SMB",
+          "protocol": "tcp",
+          "reachability": "shielded",
+          "verification": "mitigated",
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 6, "priority": "later", "impact": 0.8, "reachability": "shielded", "exploitability": "mitigated, checked actively" }
+        }
+      ]
+    },
+    "host": {
+      "scan_id": "demo-clear-host-06",
+      "target": "desk-12",
+      "scan_type": "host",
+      "status": "complete",
+      "completed_at": "@-20m",
+      "score": 96,
+      "autorun_count": 1,
+      "outdated_count": 1,
+      "os": { "system": "Windows", "release": "11", "version": "10.0.22631" },
+      "firewall": { "status": "enabled", "source": "netsh advfirewall" },
+      "listeners": {
+        "status": "complete",
+        "items": [
+          { "port": 135, "protocol": "tcp", "process": "svchost.exe", "addresses": ["0.0.0.0"], "exposure": "all" },
+          { "port": 445, "protocol": "tcp", "process": "System", "addresses": ["0.0.0.0"], "exposure": "all" },
+          { "port": 5040, "protocol": "tcp", "process": "svchost.exe", "addresses": ["127.0.0.1"], "exposure": "loopback" }
+        ]
+      },
+      "packages": {
+        "status": "complete",
+        "source": "winget",
+        "ecosystem": null,
+        "items": [
+          { "name": "7-Zip", "version": "24.08" },
+          { "name": "Git", "version": "2.47.0" },
+          { "name": "Mozilla Firefox", "version": "132.0.1" },
+          { "name": "Visual Studio Code", "version": "1.93.1" }
+        ]
+      },
+      "vulnerabilities": { "status": "complete", "packages_checked": 4, "advisories_found": 0, "fixable": 0 },
+      "findings": [
+        {
+          "finding_id": "demo-clear-sw-code",
+          "target": "desk-12",
+          "category": "software",
+          "severity": "low",
+          "title": "Update available: Visual Studio Code",
+          "description": "A newer version of this program is available.",
+          "evidence": "1.93.1 installed, 1.95.0 available",
+          "remediation": "Run: winget upgrade --id Microsoft.VisualStudioCode --exact",
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.25, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-clear-run-onedrive",
+          "target": "desk-12",
+          "category": "persistence",
+          "severity": "info",
+          "title": "Starts automatically (Run key): OneDrive",
+          "description": "This program starts with the session.",
+          "evidence": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+          "remediation": "If you do not recognize it, investigate before removing it.",
+          "triage_status": "open",
+          "risk": { "score": 2, "priority": "later", "impact": 0.05, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-clear-listener-5040",
+          "target": "desk-12",
+          "category": "listener",
+          "severity": "info",
+          "title": "svchost.exe listens on 5040/tcp (this machine only)",
+          "description": "This program only accepts connections from the machine itself.",
+          "evidence": "127.0.0.1:5040",
+          "remediation": "Verify that this process is expected to accept connections.",
+          "port": 5040,
+          "process": "svchost.exe",
+          "exposure": "loopback",
+          "reachability": "local",
+          "triage_status": "open",
+          "risk": { "score": 0, "priority": "later", "impact": 0.05, "reachability": "local", "exploitability": "assumed" }
+        }
+      ]
+    },
+    "exposure": {
+      "status": "verified",
+      "summary": { "exposed": 0, "shielded": 2, "unverified": 0, "local": 1 },
+      "probe": { "target": "198.51.100.22", "completed_at": "@-3d", "status": "complete" },
+      "probe_command": "attacklens probe 198.51.100.22 --output probe.json"
+    },
+    "scans": [
+      { "scan_id": "demo-clear-06", "target": "desk-12.example.com", "scan_type": "network", "status": "complete", "completed_at": "@-20m", "score": 94, "findings": [] },
+      { "scan_id": "demo-clear-05", "target": "desk-12.example.com", "scan_type": "network", "status": "complete", "completed_at": "@-1w", "score": 94, "findings": [] },
+      { "scan_id": "demo-clear-04", "target": "desk-12.example.com", "scan_type": "network", "status": "complete", "completed_at": "@-2w", "score": 94, "findings": [] },
+      { "scan_id": "demo-clear-03", "target": "desk-12.example.com", "scan_type": "network", "status": "complete", "completed_at": "@-3w", "score": 91, "findings": [] },
+      { "scan_id": "demo-clear-02", "target": "desk-12.example.com", "scan_type": "network", "status": "complete", "completed_at": "@-4w", "score": 83, "findings": [] },
+      { "scan_id": "demo-clear-01", "target": "desk-12.example.com", "scan_type": "network", "status": "complete", "completed_at": "@-5w", "score": 83, "findings": [] }
+    ],
+    "audit": [
+      { "entry_id": 58, "at": "@-20m", "actor": "dashboard", "action": "scan_ordered", "detail": "desk-12" },
+      { "entry_id": 57, "at": "@-3d", "actor": "dashboard", "action": "report_generated", "detail": "desk-12" },
+      { "entry_id": 56, "at": "@-5w", "actor": "agent", "action": "agent_enrolled", "detail": "desk-12" }
+    ],
+    "vulnerabilities": { "status": "complete", "packages_checked": 86, "advisories_found": 0, "vulnerabilities": [] }
+  }
+}

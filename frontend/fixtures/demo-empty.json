@@ -1,0 +1,41 @@
+{
+  "id": "empty",
+  "label": "Nothing measured yet",
+  "description": "A fresh install: no scan, no agent, no journal.",
+  "responses": {
+    "agents": [],
+    "results": null,
+    "host": null,
+    "scans": [],
+    "alerts": [],
+    "audit": [],
+    "compare": null,
+    "paths": { "paths": [], "best_cut": null },
+    "exposure": { "status": "no_host_report", "summary": {}, "probe": null },
+    "inventory": {
+      "collected_at": "@-0m",
+      "scope": "container",
+      "hostname": "attacklens-api",
+      "current_user": "attacklens",
+      "os": { "system": "Linux", "release": "6.6.31", "version": "#1 SMP", "machine": "x86_64", "python": "3.12.4" },
+      "cpu": { "logical_count": 8, "physical_count": 4, "percent_used": 2.4 },
+      "memory": { "total_bytes": 536870912, "available_bytes": 429496729, "percent_used": 20.0 },
+      "disks": [],
+      "network_addresses": [{ "interface": "eth0", "family": "IPv4", "address": "192.0.2.30" }],
+      "processes": [{ "pid": 1, "name": "uvicorn", "username": "attacklens", "status": "running" }],
+      "packages": [],
+      "python_path": "/usr/local/bin/python"
+    },
+    "vulnerabilities": { "status": "disabled", "packages_checked": 0, "vulnerabilities": [] },
+    "posture": {
+      "scope": "container",
+      "checks": [
+        { "id": "runtime-root", "title": "API runtime privileges", "status": "pass", "severity": "info", "description": "The API does not run as root.", "remediation": "" },
+        { "id": "docker-socket", "title": "Docker socket exposure", "status": "pass", "severity": "info", "description": "The Docker socket is not mounted in the container.", "remediation": "" },
+        { "id": "runtime-secrets", "title": "Secrets in environment variables", "status": "pass", "severity": "info", "description": "No variable holds a secret.", "remediation": "" },
+        { "id": "host-firewall", "title": "Host firewall visibility", "status": "not_checked", "severity": "info", "description": "A container cannot see the firewall of its host.", "remediation": "" }
+      ],
+      "summary": { "failures": 0, "warnings": 0, "unknown": 0 }
+    }
+  }
+}

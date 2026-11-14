@@ -5,14 +5,15 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "dev:demo": "node demo/dev.mjs",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "test": "vitest run"
   },
   "dependencies": {
-    "@fontsource-variable/hanken-grotesk": "^5.3.0",
-    "@fontsource-variable/newsreader": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "nuxt": "^4.6.4",
     "vue": "^3.5.44",
     "vue-router": "^5.4.0"

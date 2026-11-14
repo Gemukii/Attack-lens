@@ -1,0 +1,7 @@
+{
+  "id": "api-error",
+  "label": "API unreachable",
+  "description": "Every call answers 502, as the proxy does when the API behind it is down.",
+  "fail": 502,
+  "responses": {}
+}

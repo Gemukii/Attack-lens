@@ -1,0 +1,20 @@
+{
+  "id": "stale",
+  "label": "Agent quiet, last reading 23 days old",
+  "description": "The same workstation as the exposed scenario, but nothing has reported for 23 days: the agent went quiet and every date is that much older.",
+  "extends": "exposed",
+  "shift": "-23d",
+  "responses": {
+    "agents": [
+      {
+        "hostname": "desk-07",
+        "platform": "Windows-11-10.0.22631",
+        "version": "0.1.0",
+        "address": "192.0.2.14",
+        "last_seen": "@-0m",
+        "online": false,
+        "silent_since": "@-0m"
+      }
+    ]
+  }
+}

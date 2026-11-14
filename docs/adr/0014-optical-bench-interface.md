@@ -1,6 +1,6 @@
 # ADR-0014: Interface, the optical bench
 
-**Status:** Accepted
+**Status:** Accepted. The visual language is superseded by [ADR-0017](0017-monochrome-and-vermilion.md)
 **Date:** 2026-11-05
 **Deciders:** Gemukii
 

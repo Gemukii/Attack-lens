@@ -1,0 +1,842 @@
+{
+  "id": "exposed",
+  "label": "Agent online, confirmed ways in",
+  "description": "A Windows workstation seen from the inside two hours ago. Findings of every severity, three confirmed attack paths, a probe from another machine, ten weekly readings with a score drop, a filled journal.",
+  "responses": {
+    "agents": [
+      { "hostname": "desk-07", "platform": "Windows-11-10.0.22631", "version": "0.1.0", "address": "192.0.2.14", "last_seen": "@-0m", "online": true, "silent_since": null }
+    ],
+    "results": {
+      "scan_id": "demo-scan-10",
+      "target": "desk-07.example.com",
+      "scan_type": "network",
+      "status": "complete",
+      "completed_at": "@-2h",
+      "duration_seconds": 4.2,
+      "score": 58,
+      "raw_score": 58,
+      "vantage": "host",
+      "coverage": { "ports_checked": 37, "ports_open": 8, "ports_closed": 29, "ports_filtered": 0 },
+      "open_ports": [22, 135, 139, 445, 902, 3389, 6379, 9090],
+      "findings": [
+        {
+          "finding_id": "demo-net-6379",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "critical",
+          "title": "Redis service detected",
+          "description": "TCP port 6379 is accepting connections, and Redis answers commands without a password.",
+          "evidence": "desk-07.example.com:6379/tcp",
+          "remediation": "Bind Redis to the loopback address and require a password.",
+          "risk_reason": "A database exposed on the network increases the risk of data compromise.",
+          "port": 6379,
+          "service": "Redis",
+          "protocol": "tcp",
+          "version": "7.2.4",
+          "banner": "+PONG",
+          "reachability": "exposed",
+          "verification": "confirmed",
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 100, "priority": "now", "impact": 1, "reachability": "exposed", "exploitability": "confirmed by an active check" }
+        },
+        {
+          "finding_id": "demo-net-3389",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "high",
+          "title": "RDP service detected",
+          "description": "TCP port 3389 is accepting connections.",
+          "evidence": "desk-07.example.com:3389/tcp",
+          "remediation": "Restrict RDP to a VPN or to trusted networks, and require Network Level Authentication.",
+          "risk_reason": "RDP is a frequent target of password guessing and of remote code execution flaws.",
+          "port": 3389,
+          "service": "RDP",
+          "protocol": "tcp",
+          "reachability": "exposed",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 48, "priority": "soon", "impact": 0.8, "reachability": "exposed", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-net-22",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "medium",
+          "title": "SSH service detected",
+          "description": "TCP port 22 is accepting connections.",
+          "evidence": "desk-07.example.com:22/tcp",
+          "remediation": "Restrict SSH to trusted networks and use key-based authentication.",
+          "risk_reason": "SSH is an administration service that should be tightly restricted.",
+          "port": 22,
+          "service": "SSH",
+          "protocol": "tcp",
+          "version": "OpenSSH_for_Windows_9.5",
+          "banner": "SSH-2.0-OpenSSH_for_Windows_9.5",
+          "reachability": "exposed",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 30, "priority": "soon", "impact": 0.5, "reachability": "exposed", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-net-445",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "high",
+          "title": "SMB service detected",
+          "description": "TCP port 445 is accepting connections.",
+          "evidence": "desk-07.example.com:445/tcp",
+          "remediation": "Restrict SMB to trusted networks and block inbound Internet access.",
+          "risk_reason": "SMB exposure can enable file-sharing attacks and lateral movement.",
+          "port": 445,
+          "service": "SMB",
+          "protocol": "tcp",
+          "reachability": "shielded",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 14, "priority": "later", "impact": 0.8, "reachability": "shielded", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-net-139",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "high",
+          "title": "NetBIOS service detected",
+          "description": "TCP port 139 is accepting connections.",
+          "evidence": "desk-07.example.com:139/tcp",
+          "remediation": "Disable NetBIOS or restrict it to the required private network.",
+          "risk_reason": "NetBIOS exposure can disclose host information and enable lateral movement.",
+          "port": 139,
+          "service": "NetBIOS",
+          "protocol": "tcp",
+          "reachability": "shielded",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 14, "priority": "later", "impact": 0.8, "reachability": "shielded", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-net-9090",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "low",
+          "title": "Unknown service detected",
+          "description": "TCP port 9090 is accepting connections.",
+          "evidence": "desk-07.example.com:9090/tcp",
+          "remediation": "Identify the program behind this port and close it if it is not needed.",
+          "risk_reason": "An unidentified service accepts connections from the network.",
+          "port": 9090,
+          "service": "Unknown",
+          "protocol": "tcp",
+          "banner": "HTTP/1.1 200 OK Server: Werkzeug/3.0.3 Python/3.12.4",
+          "reachability": "unverified",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 10, "priority": "later", "impact": 0.25, "reachability": "unverified", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-net-135",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "medium",
+          "title": "MS-RPC service detected",
+          "description": "TCP port 135 is accepting connections.",
+          "evidence": "desk-07.example.com:135/tcp",
+          "remediation": "Block inbound RPC at the firewall except from trusted management hosts.",
+          "risk_reason": "MS-RPC is a frequent entry point for enumeration and lateral movement.",
+          "port": 135,
+          "service": "MS-RPC",
+          "protocol": "tcp",
+          "reachability": "shielded",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.5, "reachability": "shielded", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-net-902",
+          "target": "desk-07.example.com",
+          "category": "network",
+          "severity": "medium",
+          "title": "VMware Auth service detected",
+          "description": "TCP port 902 is accepting connections.",
+          "evidence": "desk-07.example.com:902/tcp",
+          "remediation": "Restrict this port to the host itself or to trusted management hosts.",
+          "risk_reason": "The VMware authentication service exposes the hypervisor management plane.",
+          "port": 902,
+          "service": "VMware Auth",
+          "protocol": "tcp",
+          "reachability": "shielded",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "accepted",
+          "triage_reason": "Workstation Pro is needed for lab work",
+          "triage_expires_at": "@+84d",
+          "risk": { "score": 9, "priority": "later", "impact": 0.5, "reachability": "shielded", "exploitability": "assumed" }
+        }
+      ]
+    },
+    "host": {
+      "scan_id": "demo-host-10",
+      "target": "desk-07",
+      "scan_type": "host",
+      "status": "complete",
+      "completed_at": "@-2h",
+      "score": 61,
+      "autorun_count": 3,
+      "outdated_count": 4,
+      "os": { "system": "Windows", "release": "11", "version": "10.0.22631" },
+      "firewall": { "status": "enabled", "source": "netsh advfirewall" },
+      "listeners": {
+        "status": "complete",
+        "items": [
+          {
+            "port": 22,
+            "protocol": "tcp",
+            "process": "sshd.exe",
+            "addresses": ["0.0.0.0"],
+            "exposure": "all"
+          },
+          {
+            "port": 135,
+            "protocol": "tcp",
+            "process": "svchost.exe",
+            "addresses": ["0.0.0.0"],
+            "exposure": "all"
+          },
+          {
+            "port": 139,
+            "protocol": "tcp",
+            "process": "System",
+            "addresses": ["192.0.2.14"],
+            "exposure": "interface"
+          },
+          {
+            "port": 445,
+            "protocol": "tcp",
+            "process": "System",
+            "addresses": ["0.0.0.0"],
+            "exposure": "all"
+          },
+          {
+            "port": 902,
+            "protocol": "tcp",
+            "process": "vmware-authd.exe",
+            "addresses": ["0.0.0.0"],
+            "exposure": "all"
+          },
+          {
+            "port": 3389,
+            "protocol": "tcp",
+            "process": "svchost.exe",
+            "addresses": ["0.0.0.0"],
+            "exposure": "all"
+          },
+          {
+            "port": 5040,
+            "protocol": "tcp",
+            "process": "svchost.exe",
+            "addresses": ["127.0.0.1"],
+            "exposure": "loopback"
+          },
+          {
+            "port": 5432,
+            "protocol": "tcp",
+            "process": "postgres.exe",
+            "addresses": ["127.0.0.1"],
+            "exposure": "loopback"
+          },
+          {
+            "port": 6379,
+            "protocol": "tcp",
+            "process": "redis-server.exe",
+            "addresses": ["0.0.0.0"],
+            "exposure": "all"
+          },
+          {
+            "port": 9090,
+            "protocol": "tcp",
+            "process": "python.exe",
+            "addresses": ["0.0.0.0"],
+            "exposure": "all"
+          }
+        ]
+      },
+      "packages": {
+        "status": "complete",
+        "source": "winget",
+        "ecosystem": null,
+        "items": [
+          { "name": "7-Zip", "version": "24.08" },
+          { "name": "Docker Desktop", "version": "4.34.2" },
+          { "name": "Git", "version": "2.46.0" },
+          { "name": "Mozilla Firefox", "version": "131.0" },
+          { "name": "Node.js", "version": "22.9.0" },
+          { "name": "Notepad++", "version": "8.6.9" },
+          { "name": "PostgreSQL 16", "version": "16.4" },
+          { "name": "Python 3.12", "version": "3.12.4" },
+          { "name": "Redis", "version": "7.2.4" },
+          { "name": "Visual Studio Code", "version": "1.93.1" },
+          { "name": "VMware Workstation", "version": "17.5.2" },
+          { "name": "WinRAR", "version": "6.21" }
+        ]
+      },
+      "vulnerabilities": { "status": "complete", "packages_checked": 12, "advisories_found": 1, "fixable": 1 },
+      "findings": [
+        {
+          "finding_id": "demo-host-winrar",
+          "target": "desk-07",
+          "category": "vulnerability",
+          "severity": "high",
+          "title": "CVE-2023-38831 in WinRAR",
+          "description": "WinRAR before 6.23 runs code when a user opens a harmless-looking file inside a crafted archive.",
+          "evidence": "WinRAR 6.21",
+          "remediation": "Upgrade WinRAR to 6.23 or later.",
+          "risk_reason": "This flaw is in the CISA list of vulnerabilities exploited in the wild.",
+          "cve": "CVE-2023-38831",
+          "cvss": 7.8,
+          "version": "6.21",
+          "known_exploited": true,
+          "triage_status": "open",
+          "risk": { "score": 48, "priority": "soon", "impact": 0.8, "reachability": "no network path", "exploitability": "exploited in the wild (CISA KEV)" }
+        },
+        {
+          "finding_id": "demo-host-listener-6379",
+          "target": "desk-07",
+          "category": "listener",
+          "severity": "high",
+          "title": "redis-server.exe listens on 6379/tcp (every network)",
+          "description": "This program accepts connections from any network the machine is connected to.",
+          "evidence": "0.0.0.0:6379",
+          "remediation": "Bind Redis to the loopback address and require a password.",
+          "port": 6379,
+          "process": "redis-server.exe",
+          "exposure": "all",
+          "reachability": "exposed",
+          "triage_status": "open",
+          "risk": { "score": 48, "priority": "soon", "impact": 0.8, "reachability": "exposed", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-admin",
+          "target": "desk-07",
+          "category": "posture",
+          "severity": "high",
+          "title": "The daily account is an administrator",
+          "description": "The account used every day belongs to the Administrators group, so anything it runs is one consent prompt away from full control.",
+          "evidence": "DESK-07\\m.rivers is a member of Administrators",
+          "remediation": "Use a standard account for daily work and keep a separate administrator account for installations.",
+          "risk_reason": "Two attack paths end with this account.",
+          "triage_status": "open",
+          "risk": { "score": 29, "priority": "soon", "impact": 0.8, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-disk",
+          "target": "desk-07",
+          "category": "posture",
+          "severity": "medium",
+          "title": "The system disk is not encrypted",
+          "description": "BitLocker is off on C:, so the disk can be read from another system.",
+          "evidence": "C: protection status: off",
+          "remediation": "Turn on BitLocker for the system disk and keep the recovery key somewhere safe.",
+          "triage_status": "open",
+          "risk": { "score": 18, "priority": "later", "impact": 0.5, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-updates",
+          "target": "desk-07",
+          "category": "posture",
+          "severity": "medium",
+          "title": "Windows updates are late",
+          "description": "The last update was installed 41 days ago.",
+          "evidence": "Last installed update 41 days ago",
+          "remediation": "Open Windows Update and install what is waiting.",
+          "triage_status": "open",
+          "risk": { "score": 18, "priority": "later", "impact": 0.5, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-listener-9090",
+          "target": "desk-07",
+          "category": "listener",
+          "severity": "low",
+          "title": "python.exe listens on 9090/tcp (every network)",
+          "description": "This program accepts connections from any network the machine is connected to.",
+          "evidence": "0.0.0.0:9090",
+          "remediation": "Verify that this process is expected to accept connections.",
+          "port": 9090,
+          "process": "python.exe",
+          "exposure": "all",
+          "reachability": "unverified",
+          "triage_status": "open",
+          "risk": { "score": 10, "priority": "later", "impact": 0.25, "reachability": "unverified", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-listener-5432",
+          "target": "desk-07",
+          "category": "listener",
+          "severity": "info",
+          "title": "postgres.exe listens on 5432/tcp (this machine only)",
+          "description": "This program only accepts connections from the machine itself.",
+          "evidence": "127.0.0.1:5432",
+          "remediation": "Verify that this process is expected to accept connections.",
+          "port": 5432,
+          "process": "postgres.exe",
+          "exposure": "loopback",
+          "reachability": "local",
+          "triage_status": "open",
+          "risk": { "score": 0, "priority": "later", "impact": 0.05, "reachability": "local", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-guest",
+          "target": "desk-07",
+          "category": "posture",
+          "severity": "info",
+          "title": "The firewall is on for every profile",
+          "description": "Domain, private and public profiles all block inbound traffic by default.",
+          "evidence": "netsh advfirewall show allprofiles",
+          "remediation": "Nothing to do.",
+          "triage_status": "open",
+          "risk": { "score": 2, "priority": "later", "impact": 0.05, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-sw-firefox",
+          "target": "desk-07",
+          "category": "software",
+          "severity": "low",
+          "title": "Update available: Mozilla Firefox",
+          "description": "A newer version of this program is available.",
+          "evidence": "131.0 installed, 132.0.1 available",
+          "remediation": "Run: winget upgrade --id Mozilla.Firefox --exact",
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.25, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-sw-git",
+          "target": "desk-07",
+          "category": "software",
+          "severity": "low",
+          "title": "Update available: Git",
+          "description": "A newer version of this program is available.",
+          "evidence": "2.46.0 installed, 2.47.0 available",
+          "remediation": "Run: winget upgrade --id Git.Git --exact",
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.25, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-sw-node",
+          "target": "desk-07",
+          "category": "software",
+          "severity": "low",
+          "title": "Update available: Node.js",
+          "description": "A newer version of this program is available.",
+          "evidence": "22.9.0 installed, 22.11.0 available",
+          "remediation": "Run: winget upgrade --id OpenJS.NodeJS --exact",
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.25, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-sw-winrar",
+          "target": "desk-07",
+          "category": "software",
+          "severity": "low",
+          "title": "Update available: WinRAR",
+          "description": "A newer version of this program is available.",
+          "evidence": "6.21 installed, 7.01 available",
+          "remediation": "Run: winget upgrade --id RARLab.WinRAR --exact",
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.25, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-run-onedrive",
+          "target": "desk-07",
+          "category": "persistence",
+          "severity": "info",
+          "title": "Starts automatically (Run key): OneDrive",
+          "description": "This program starts with the session.",
+          "evidence": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+          "remediation": "If you do not recognize it, investigate before removing it.",
+          "triage_status": "open",
+          "risk": { "score": 2, "priority": "later", "impact": 0.05, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-run-docker",
+          "target": "desk-07",
+          "category": "persistence",
+          "severity": "info",
+          "title": "Starts automatically (Run key): Docker Desktop",
+          "description": "This program starts with the session.",
+          "evidence": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+          "remediation": "If you do not recognize it, investigate before removing it.",
+          "triage_status": "open",
+          "risk": { "score": 2, "priority": "later", "impact": 0.05, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-host-run-task",
+          "target": "desk-07",
+          "category": "persistence",
+          "severity": "info",
+          "title": "Starts automatically (Scheduled task): RedisNightlyDump",
+          "description": "This task runs every day at 02:00.",
+          "evidence": "\\RedisNightlyDump",
+          "remediation": "If you do not recognize it, investigate before removing it.",
+          "triage_status": "open",
+          "risk": { "score": 2, "priority": "later", "impact": 0.05, "reachability": "no network path", "exploitability": "assumed" }
+        }
+      ]
+    },
+    "paths": {
+      "paths": [
+        {
+          "id": "exploited-flaw",
+          "title": "A flaw used by attackers today",
+          "severity": "critical",
+          "certainty": "confirmed",
+          "entries": [],
+          "steps": [
+            { "stage": "Entry", "label": "CVE-2023-38831 is in the CISA KEV list", "finding_id": "demo-host-winrar" },
+            { "stage": "Impact", "label": "Public exploits exist for this flaw", "finding_id": null }
+          ]
+        },
+        {
+          "id": "data-theft",
+          "title": "Direct access to a database",
+          "severity": "critical",
+          "certainty": "confirmed",
+          "entries": ["demo-net-6379"],
+          "steps": [
+            { "stage": "Entry", "label": "Reach Redis (6379/tcp) from the network", "finding_id": "demo-net-6379" },
+            { "stage": "Access", "label": "No authentication is required", "finding_id": null },
+            { "stage": "Impact", "label": "Read or alter the stored data", "finding_id": null }
+          ]
+        },
+        {
+          "id": "remote-takeover",
+          "title": "Remote takeover through an administration service",
+          "severity": "high",
+          "certainty": "confirmed",
+          "entries": ["demo-net-3389", "demo-net-22"],
+          "steps": [
+            { "stage": "Entry", "label": "Reach RDP (3389/tcp) from the network", "finding_id": "demo-net-3389" },
+            { "stage": "Access", "label": "Stolen or guessed credentials of the daily account", "finding_id": null },
+            { "stage": "Privilege", "label": "That account is an administrator", "finding_id": "demo-host-admin" },
+            { "stage": "Impact", "label": "Full control of the machine", "finding_id": null }
+          ]
+        },
+        {
+          "id": "malware-chain",
+          "title": "A malicious file escalates to full control",
+          "severity": "medium",
+          "certainty": "potential",
+          "entries": [],
+          "steps": [
+            { "stage": "Entry", "label": "Malicious file targets one of 4 outdated programs", "finding_id": null },
+            { "stage": "Execution", "label": "Code runs in the daily session", "finding_id": null },
+            { "stage": "Privilege", "label": "One consent prompt from administrator rights", "finding_id": "demo-host-admin" },
+            { "stage": "Impact", "label": "Persistence and full control of the machine", "finding_id": null }
+          ]
+        },
+        {
+          "id": "device-theft",
+          "title": "A stolen laptop gives up its data",
+          "severity": "medium",
+          "certainty": "potential",
+          "entries": [],
+          "steps": [
+            { "stage": "Entry", "label": "Physical access to the laptop", "finding_id": null },
+            { "stage": "Access", "label": "The disk can be read from another system", "finding_id": "demo-host-disk" },
+            { "stage": "Impact", "label": "All local files and saved credentials", "finding_id": null }
+          ]
+        }
+      ],
+      "best_cut": { "finding_id": "demo-host-admin", "title": "The daily account is an administrator", "remediation": "Use a standard account for daily work and keep a separate administrator account for installations.", "paths_broken": 2 }
+    },
+    "exposure": {
+      "status": "verified",
+      "summary": { "exposed": 3, "shielded": 4, "unverified": 1, "local": 2 },
+      "probe": { "target": "192.0.2.14", "completed_at": "@-1d", "status": "complete" },
+      "probe_command": "attacklens probe 192.0.2.14 --output probe.json"
+    },
+    "scans": [
+      {
+        "scan_id": "demo-scan-10",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-2h",
+        "score": 58,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-09",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-1w",
+        "score": 74,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-08",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-2w",
+        "score": 74,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-07",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-3w",
+        "score": 78,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-06",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-4w",
+        "score": 78,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-05",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-5w",
+        "score": 81,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-04",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-6w",
+        "score": 81,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-03",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-7w",
+        "score": 79,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-02",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-8w",
+        "score": 86,
+        "findings": []
+      },
+      {
+        "scan_id": "demo-scan-01",
+        "target": "desk-07.example.com",
+        "scan_type": "network",
+        "status": "complete",
+        "completed_at": "@-9w",
+        "score": 86,
+        "findings": []
+      }
+    ],
+    "compare": {
+      "before_id": "demo-scan-09",
+      "after_id": "demo-scan-10",
+      "score_delta": -16,
+      "finding_count_delta": 2,
+      "new_findings": [
+        { "finding_id": "demo-net-6379", "severity": "critical", "title": "Redis service detected", "port": 6379 },
+        { "finding_id": "demo-net-9090", "severity": "low", "title": "Unknown service detected", "port": 9090 }
+      ],
+      "fixed_findings": [],
+      "persistent_findings": [
+        { "finding_id": "demo-net-3389", "severity": "high", "title": "RDP service detected", "port": 3389 },
+        { "finding_id": "demo-net-22", "severity": "medium", "title": "SSH service detected", "port": 22 },
+        { "finding_id": "demo-net-445", "severity": "high", "title": "SMB service detected", "port": 445 },
+        { "finding_id": "demo-net-139", "severity": "high", "title": "NetBIOS service detected", "port": 139 },
+        { "finding_id": "demo-net-135", "severity": "medium", "title": "MS-RPC service detected", "port": 135 }
+      ],
+      "ports_added": [6379, 9090],
+      "ports_removed": []
+    },
+    "alerts": [
+      {
+        "alert_id": 107,
+        "scan_id": "demo-scan-10",
+        "target": "desk-07.example.com",
+        "created_at": "@-2h",
+        "message": "AttackLens: 2 new findings on desk-07.example.com",
+        "delivered": true,
+        "findings": [
+          { "finding_id": "demo-net-6379", "severity": "critical", "title": "Redis service detected", "port": 6379 },
+          { "finding_id": "demo-net-9090", "severity": "low", "title": "Unknown service detected", "port": 9090 }
+        ]
+      },
+      {
+        "alert_id": 106,
+        "scan_id": "demo-host-10",
+        "target": "desk-07",
+        "created_at": "@-2h",
+        "message": "AttackLens: 1 new finding on desk-07",
+        "delivered": true,
+        "findings": [
+          { "finding_id": "demo-host-winrar", "severity": "high", "title": "CVE-2023-38831 in WinRAR", "known_exploited": true }
+        ]
+      },
+      {
+        "alert_id": 105,
+        "scan_id": "demo-scan-08",
+        "target": "desk-07",
+        "created_at": "@-13d",
+        "message": "AttackLens: desk-07 answered again after 19 hours of silence",
+        "delivered": true,
+        "findings": []
+      },
+      {
+        "alert_id": 104,
+        "scan_id": "demo-scan-08",
+        "target": "desk-07",
+        "created_at": "@-2w",
+        "message": "AttackLens: desk-07 went quiet",
+        "delivered": true,
+        "findings": []
+      },
+      {
+        "alert_id": 103,
+        "scan_id": "demo-scan-07",
+        "target": "desk-07.example.com",
+        "created_at": "@-3w",
+        "message": "AttackLens: 1 new finding on desk-07.example.com",
+        "delivered": true,
+        "findings": [
+          { "finding_id": "demo-net-22", "severity": "medium", "title": "SSH service detected", "port": 22 }
+        ]
+      },
+      {
+        "alert_id": 102,
+        "scan_id": "demo-scan-05",
+        "target": "desk-07",
+        "created_at": "@-5w",
+        "message": "AttackLens: 1 new finding on desk-07",
+        "delivered": false,
+        "findings": [
+          { "finding_id": "demo-host-disk", "severity": "medium", "title": "The system disk is not encrypted" }
+        ]
+      },
+      {
+        "alert_id": 101,
+        "scan_id": "demo-scan-03",
+        "target": "desk-07.example.com",
+        "created_at": "@-7w",
+        "message": "AttackLens: 1 new finding on desk-07.example.com",
+        "delivered": true,
+        "findings": [
+          { "finding_id": "demo-net-3389", "severity": "high", "title": "RDP service detected", "port": 3389 }
+        ]
+      }
+    ],
+    "audit": [
+      { "entry_id": 212, "at": "@-2h", "actor": "dashboard", "action": "scan_ordered", "detail": "desk-07" },
+      { "entry_id": 211, "at": "@-1d", "actor": "dashboard", "action": "report_generated", "detail": "desk-07" },
+      { "entry_id": 210, "at": "@-1d", "actor": "api", "action": "backup_created", "detail": null },
+      { "entry_id": 209, "at": "@-6d", "actor": "dashboard", "action": "finding_accepted", "detail": "VMware Auth service detected" },
+      { "entry_id": 208, "at": "@-1w", "actor": "dashboard", "action": "scan_ordered", "detail": "desk-07" },
+      { "entry_id": 207, "at": "@-2w", "actor": "dashboard", "action": "finding_reopened", "detail": "SSH service detected" },
+      { "entry_id": 206, "at": "@-3w", "actor": "dashboard", "action": "finding_false_positive", "detail": "SSH service detected" },
+      { "entry_id": 205, "at": "@-4w", "actor": "api", "action": "backup_failed", "detail": "Disk full" },
+      { "entry_id": 204, "at": "@-9w", "actor": "agent", "action": "agent_enrolled", "detail": "desk-07" },
+      { "entry_id": 203, "at": "@-9w", "actor": "dashboard", "action": "enrollment_code_created", "detail": null }
+    ],
+    "inventory": {
+      "collected_at": "@-0m",
+      "scope": "container",
+      "hostname": "attacklens-api",
+      "current_user": "attacklens",
+      "os": { "system": "Linux", "release": "6.6.31", "version": "#1 SMP", "machine": "x86_64", "python": "3.12.4" },
+      "cpu": { "logical_count": 8, "physical_count": 4, "percent_used": 3.1 },
+      "memory": { "total_bytes": 536870912, "available_bytes": 402653184, "percent_used": 25 },
+      "disks": [],
+      "network_addresses": [
+        { "interface": "eth0", "family": "IPv4", "address": "192.0.2.30" }
+      ],
+      "processes": [
+        { "pid": 1, "name": "uvicorn", "username": "attacklens", "status": "running" }
+      ],
+      "packages": [],
+      "python_path": "/usr/local/bin/python"
+    },
+    "vulnerabilities": {
+      "status": "complete",
+      "packages_checked": 86,
+      "advisories_found": 0,
+      "vulnerabilities": []
+    },
+    "posture": {
+      "scope": "container",
+      "checks": [
+        { "id": "runtime-root", "title": "API runtime privileges", "status": "pass", "severity": "info", "description": "The API does not run as root.", "remediation": "" },
+        { "id": "docker-socket", "title": "Docker socket exposure", "status": "pass", "severity": "info", "description": "The Docker socket is not mounted in the container.", "remediation": "" },
+        {
+          "id": "runtime-secrets",
+          "title": "Secrets in environment variables",
+          "status": "warn",
+          "severity": "medium",
+          "description": "One variable holds a secret.",
+          "remediation": "Prefer a mounted secret file.",
+          "evidence": ["ATTACKLENS_API_KEY"]
+        },
+        { "id": "host-firewall", "title": "Host firewall visibility", "status": "not_checked", "severity": "info", "description": "A container cannot see the firewall of its host.", "remediation": "" }
+      ],
+      "summary": { "failures": 0, "warnings": 1, "unknown": 0 }
+    }
+  },
+  "afterScan": {
+    "alerts": [
+      {
+        "alert_id": 108,
+        "scan_id": "demo-scan-11",
+        "target": "desk-07.example.com",
+        "created_at": "@-0m",
+        "message": "AttackLens: 1 new finding on desk-07.example.com",
+        "delivered": true,
+        "findings": [
+          { "finding_id": "demo-net-5900", "severity": "high", "title": "VNC service detected", "port": 5900 }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "finding_id": "demo-net-5900",
+        "target": "desk-07.example.com",
+        "category": "network",
+        "severity": "high",
+        "title": "VNC service detected",
+        "description": "TCP port 5900 is accepting connections.",
+        "evidence": "desk-07.example.com:5900/tcp",
+        "remediation": "Close VNC or restrict it to a VPN, and require a strong password.",
+        "risk_reason": "VNC gives remote control of the screen and is often weakly protected.",
+        "port": 5900,
+        "service": "VNC",
+        "protocol": "tcp",
+        "banner": "RFB 003.008",
+        "reachability": "unverified",
+        "verification": null,
+        "known_exploited": false,
+        "triage_status": "open",
+        "risk": { "score": 34, "priority": "soon", "impact": 0.8, "reachability": "unverified", "exploitability": "assumed" }
+      }
+    ]
+  }
+}

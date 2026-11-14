@@ -1,24 +1,24 @@
 <script setup lang="ts">
-// Severity reads like an aperture: the more open the circle is filled, the worse it is.
-const props = defineProps<{
+// Severity is an intensity: four cells, lit from the left, and red only when all four are.
+// It always comes with its word.
+const props = withDefaults(defineProps<{
   severity?: string
   labelled?: boolean
-}>()
+}>(), { labelled: true })
+
+const LEVELS: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 }
 
 const level = computed(() => props.severity?.toLowerCase() ?? 'info')
+const lit = computed(() => LEVELS[level.value] ?? 0)
 const word = computed(() => level.value.charAt(0).toUpperCase() + level.value.slice(1))
 </script>
 
 <template>
-  <span class="severity">
-    <svg viewBox="0 0 14 14" width="14" height="14" :aria-hidden="labelled ? 'true' : undefined" :aria-label="labelled ? undefined : level" role="img">
+  <span :class="['severity', `severity-${level}`]">
+    <svg class="severity-mark" viewBox="0 0 22.5 9" width="22.5" height="9" :aria-hidden="labelled ? 'true' : undefined" :aria-label="labelled ? undefined : word" role="img">
       <title>{{ word }}</title>
-      <circle v-if="level === 'critical'" cx="7" cy="7" r="6" fill="var(--safelight)" />
-      <circle v-else-if="level === 'info'" cx="7" cy="7" r="2" fill="var(--paper-dim)" />
-      <circle v-else cx="7" cy="7" r="5.5" fill="none" stroke="var(--mark)" />
-      <circle v-if="level === 'high'" cx="7" cy="7" r="3.6" fill="var(--safelight)" />
-      <path v-else-if="level === 'medium'" d="M7 3.4a3.6 3.6 0 0 1 0 7.2z" fill="var(--safelight)" />
+      <rect v-for="index in 4" :key="index" :x="(index - 1) * 6" y="0" width="4.5" height="9" :class="{ lit: index <= lit }" />
     </svg>
-    <span v-if="labelled">{{ word }}</span>
+    <span v-if="labelled" class="severity-word">{{ word }}</span>
   </span>
 </template>

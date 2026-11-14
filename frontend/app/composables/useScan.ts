@@ -8,8 +8,12 @@ const getApiErrorMessage = (cause: unknown, fallback: string) => {
   const error = cause as {
     data?: { detail?: string }
     response?: { _data?: { detail?: string }; status?: number }
+    statusCode?: number
     message?: string
   }
+  // The proxy answers 502 to 504 when the API behind it is down: say so in plain words.
+  const status = error.response?.status ?? error.statusCode
+  if (status && status >= 502 && status <= 504) return 'The API is not answering. Is attacklens start still running?'
   return error.data?.detail
     ?? error.response?._data?.detail
     ?? error.message
@@ -36,6 +40,12 @@ export const useScan = () => {
   const paths = ref<AttackPathReport | null>(null)
   const exposure = ref<ExposureReport | null>(null)
   const audit = ref<AuditEntry[]>([])
+  // When the API last answered, and whether its last poll failed: the freshness indicator.
+  const syncedAt = ref<number | null>(null)
+  const syncFailed = ref(false)
+  // Alerts that arrived after the first load, so the journal can show them arriving.
+  const freshAlertIds = ref<Set<number>>(new Set())
+  let alertsPrimed = false
 
   const loadResults = async () => {
     try {
@@ -86,7 +96,13 @@ export const useScan = () => {
 
   const loadAlerts = async () => {
     try {
-      alerts.value = await api.getAlerts()
+      const next = await api.getAlerts()
+      if (alertsPrimed) {
+        const known = new Set(alerts.value.map((alert) => alert.alert_id))
+        freshAlertIds.value = new Set(next.filter((alert) => !known.has(alert.alert_id)).map((alert) => alert.alert_id))
+      }
+      alertsPrimed = true
+      alerts.value = next
     } catch {
       alerts.value = []
     }
@@ -96,8 +112,11 @@ export const useScan = () => {
     const wasOnline = Boolean(agent.value)
     try {
       agents.value = await api.getAgents()
+      syncedAt.value = Date.now()
+      syncFailed.value = false
     } catch {
       agents.value = []
+      syncFailed.value = true
     }
     // The agent sends a host report when it starts: show it without a manual refresh.
     if (!wasOnline && agent.value) await loadHostReport()
@@ -184,5 +203,5 @@ export const useScan = () => {
     }
   }
 
-  return { results, history, comparison, inventory, vulnerabilities, posture, hostReport, alerts, agent, silentAgent, paths, exposure, audit, status, error, loadAll, loadAgents, compareScans, runScan, setTriage, createEnrollmentCode }
+  return { results, history, comparison, inventory, vulnerabilities, posture, hostReport, alerts, freshAlertIds, agent, silentAgent, paths, exposure, audit, status, error, syncedAt, syncFailed, loadAll, loadAgents, compareScans, runScan, setTriage, createEnrollmentCode }
 }

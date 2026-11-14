@@ -55,9 +55,11 @@ flowchart LR
 | [0011](0011-finding-lifecycle.md) | Finding and alert lifecycle | Accepted |
 | [0012](0012-rule-based-attack-paths.md) | Attack paths from explicit rules | Accepted |
 | [0013](0013-supply-chain.md) | Locked supply chain | Accepted |
-| [0014](0014-optical-bench-interface.md) | Interface: the optical bench | Accepted |
+| [0014](0014-optical-bench-interface.md) | Interface: the optical bench | Accepted, visual language superseded by 0017 |
 | [0015](0015-minimal-audit-mode.md) | Minimal audit mode | Accepted |
 | [0016](0016-backups-and-retention.md) | Off-volume backups and retention | Accepted |
+| [0017](0017-monochrome-and-vermilion.md) | Visual language: monochrome and vermilion | Accepted, visual language superseded by 0018 |
+| [0018](0018-instrument-interface.md) | Interface as a measuring instrument | Accepted |
 
 ## Known weaknesses
 

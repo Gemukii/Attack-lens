@@ -1,4 +1,4 @@
-import type { AttackPathReport, ExposureReport, Finding, ScanResults } from '~/types/scan'
+import type { AttackPathReport, ExposureReport, Finding, ScanHistory, ScanResults } from '~/types/scan'
 import { byRisk, isOpen } from '~/utils/findings'
 
 export interface Brief {
@@ -48,14 +48,17 @@ export const writeBrief = (
     return {
       headline: 'No way in, as far as we can see.',
       lead: proved
-        ? 'A probe from another machine agrees.'
+        ? 'Seen from inside the machine, and checked from another one.'
         : 'This comes from inside the machine. Only a probe from another one can prove it.',
     }
   }
   if (confirmed.length) {
     return {
-      headline: `${count(confirmed.length)} confirmed way${confirmed.length === 1 ? '' : 's'} in.`,
-      lead: 'The evidence is there, not just the theory. Start with the first item below.',
+      // The figure beside it counts every way in: the sentence must count the same thing.
+      headline: confirmed.length === chains.length
+        ? `${count(confirmed.length)} confirmed way${confirmed.length === 1 ? '' : 's'} in.`
+        : `${count(chains.length)} ways in, ${count(confirmed.length).toLowerCase()} confirmed.`,
+      lead: 'Each confirmed one has evidence behind it. Start with the first item below.',
     }
   }
   return {
@@ -64,6 +67,55 @@ export const writeBrief = (
       ? 'A probe from another machine found no entry for now.'
       : 'Your firewall probably stops the network ones, but only a probe from another machine can tell.',
   }
+}
+
+// The main figure. It stays empty, never zero, when nothing has been looked at from the inside.
+export interface WaysIn {
+  value: number | null
+  note: string
+  alert: boolean
+}
+
+export const countWaysIn = (
+  scan: ScanResults | null,
+  paths: AttackPathReport | null,
+  exposure: ExposureReport | null,
+  seenFromInside: boolean,
+): WaysIn => {
+  if (!scan) return { value: null, note: 'No reading yet', alert: false }
+  if (scan.status === 'no_response') return { value: null, note: 'The target did not answer', alert: false }
+  if (!seenFromInside) return { value: null, note: 'Needs the view from inside', alert: false }
+
+  const chains = paths?.paths ?? []
+  const confirmed = chains.filter((path) => path.certainty === 'confirmed').length
+  if (confirmed) return { value: chains.length, note: `${confirmed} confirmed`, alert: true }
+  if (chains.length) return { value: chains.length, note: 'None proved', alert: false }
+  return {
+    value: 0,
+    note: exposure?.status === 'verified' ? 'Checked by an outside probe' : 'Not proved by a probe',
+    alert: false,
+  }
+}
+
+// A drop of this many points between two readings is worth the red.
+export const SCORE_DROP_ALERT = 10
+
+export interface ScoreTrend {
+  values: number[]
+  delta: number | null
+  alert: boolean
+}
+
+export const scoreTrend = (history: ScanHistory, limit = 12): ScoreTrend => {
+  const values = [...history]
+    .filter((scan) => typeof scan.score === 'number')
+    .sort((a, b) => (a.completed_at ?? '').localeCompare(b.completed_at ?? ''))
+    .slice(-limit)
+    .map((scan) => scan.score as number)
+  const last = values.at(-1)
+  const before = values.at(-2)
+  const delta = last !== undefined && before !== undefined ? last - before : null
+  return { values, delta, alert: delta !== null && delta <= -SCORE_DROP_ALERT }
 }
 
 export interface Action {

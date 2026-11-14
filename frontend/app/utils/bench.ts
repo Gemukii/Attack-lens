@@ -4,6 +4,7 @@ import { byRisk, isOpen } from '~/utils/findings'
 // The optical bench: every service is a ray leaving the network. The firewall is the
 // aperture stop, services and the user account are lenses, and the focus is what an
 // attacker is after. A ray reaching the focus is an attack path.
+// This file says what is on the bench. utils/glyphField.ts draws it.
 
 export type RayState = 'proved' | 'unproved' | 'stopped'
 
@@ -30,8 +31,6 @@ export interface Bench {
   admin: boolean | null
   focused: boolean
 }
-
-export const STATIONS = { source: 0, stop: 0.27, service: 0.5, account: 0.73, focus: 0.955 }
 
 const MAX_RAYS = 7
 
@@ -80,51 +79,15 @@ export const buildBench = (
   }
 }
 
-export const STOP_OPENING = 0.68
+// A ray is a proved way in when it is reachable from outside and leads to full control.
+// It is the only thing on the bench drawn in the accent.
+export const isProvedWay = (ray: Pick<Ray, 'state' | 'reaches'>) => ray.reaches && ray.state === 'proved'
 
-// Like real rays from afar, they arrive parallel to the axis. Rays that get through
-// pass inside the opening of the stop, and blocked ones strike its blades.
-export const rayHeights = (rays: Array<Pick<Ray, 'state'>>): number[] => {
-  const passing = rays.filter((ray) => ray.state !== 'stopped').length
-  let passed = 0
-  let blocked = 0
-  return rays.map((ray) => {
-    if (ray.state === 'stopped') {
-      const side = blocked % 2 === 0 ? -1 : 1
-      const row = Math.floor(blocked / 2)
-      blocked += 1
-      return side * (STOP_OPENING + 0.09 + row * 0.1)
-    }
-    passed += 1
-    if (passing === 1) return -0.3
-    return -0.56 + (1.12 * (passed - 1)) / (passing - 1)
-  })
-}
-
-export const rayPoints = (height: number, ray: Pick<Ray, 'state' | 'reaches'>): Array<[number, number]> => {
-  if (ray.state === 'stopped') {
-    return [[STATIONS.source, height], [STATIONS.stop, height]]
-  }
-  if (!ray.reaches) {
-    // It gets through, but no known path leads anywhere from there.
-    return [[STATIONS.source, height], [STATIONS.service, height], [0.585, height * 0.86]]
-  }
-  return [
-    [STATIONS.source, height],
-    [STATIONS.service, height],
-    [STATIONS.account, height * 0.52],
-    [STATIONS.focus, 0],
-  ]
-}
-
-// A file you open comes in behind the firewall: that is the point of drawing it.
-export const SIDE_START: [number, number] = [0.6, 1]
-
-export const sideRayPoints = (index: number): Array<[number, number]> => [
-  [SIDE_START[0] + index * 0.04, SIDE_START[1]],
-  [STATIONS.account, 0.3],
-  [STATIONS.focus, 0],
-]
+// Ways in that do not go through the network cannot be drawn as rays: they are named instead.
+export const waysNotDrawn = (paths: AttackPathReport | null): string[] =>
+  (paths?.paths ?? [])
+    .filter((path) => !(path.entries ?? []).length && path.id !== 'malware-chain')
+    .map((path) => path.title)
 
 export const describeRay = (ray: Ray) => {
   const name = `${ray.label}, port ${ray.port}`

@@ -1,0 +1,48 @@
+/*
+ * Level 3, component tokens: one decision about one component.
+ *
+ * Named category-property-element-variant-state. Each one points at an alias, so that a
+ * component can be retuned here without hunting for it in the styles.
+ */
+
+:root {
+  /* Focus is neutral: the accent reports a threat, not where the keyboard is. */
+  --color-outline-focus: var(--fg-primary);
+
+  /* The one primary button of a view. Never in the accent. */
+  --color-bg-button-primary: var(--fg-primary);
+  --color-bg-button-primary-hover: var(--fg-secondary);
+  --color-fg-button-primary: var(--fg-inverted);
+  --color-bg-button-primary-pressed: var(--fg-muted);
+  --color-bg-button-pressed: var(--bg-overlay);
+
+  --color-bg-row-hover: var(--bg-overlay);
+  --color-bg-row-pressed: var(--bg-active);
+  --color-bg-row-critical: var(--bg-critical);
+  --color-bg-row-new: var(--bg-critical);
+
+  --color-fg-kpi-delta: var(--fg-muted);
+  --color-fg-kpi-delta-alert: var(--accent-fg);
+
+  --color-bg-skeleton: var(--bg-overlay);
+
+  /* The mark of the current choice: the rule under a view or a tab, the thumb of a segment. */
+  --color-bg-indicator: var(--fg-primary);
+  --color-bg-indicator-segment: var(--fg-secondary);
+
+  /* A fact of the reading line that was just replaced. Neutral: a new reading is not a threat. */
+  --color-bg-reading-changed: var(--bg-active);
+
+  /* The field steps back while a scan runs, and its labels stay readable. */
+  --opacity-bench-scanning: 0.4;
+
+  /* The agent lamp: quiet when all is well, accent when the feed is broken. */
+  --color-bg-lamp-online: var(--fg-primary);
+  --color-bg-lamp-offline: var(--accent);
+
+  /* The bench, as a line drawing. */
+  --color-stroke-bench-line: var(--border-strong);
+  --color-stroke-bench-ray: var(--fg-secondary);
+  --color-stroke-bench-ray-stopped: var(--border-strong);
+  --color-stroke-bench-ray-reaches: var(--accent);
+}

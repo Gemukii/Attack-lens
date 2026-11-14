@@ -1,0 +1,180 @@
+/*
+ * Lists and tables: findings, ports, journal, facts. Rules between rows, no cards.
+ */
+
+/* Severity: four cells, lit from the left, and red only when all four are. */
+.severity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--severity-low);
+  font-size: var(--font-size-body-s);
+  white-space: nowrap;
+}
+
+.severity-mark { flex: none; overflow: visible; }
+.severity-mark rect { fill: var(--border-subtle); }
+.severity-mark rect.lit { fill: currentColor; }
+.severity-critical { color: var(--accent-fg); }
+.severity-critical .severity-mark rect.lit { fill: var(--severity-critical); }
+.severity-high { color: var(--severity-high); }
+.severity-medium { color: var(--severity-medium); }
+
+/* Tabs and segments */
+
+.tabs { position: relative; display: flex; gap: 0 var(--space-1); border-bottom: var(--border-width) solid var(--border-subtle); }
+
+.tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--size-row);
+  padding: 0 var(--space-3);
+  margin-bottom: calc(var(--border-width) * -1);
+  color: var(--fg-muted);
+  border-bottom: var(--border-width) solid transparent;
+}
+
+.tab:hover { color: var(--fg-secondary); }
+.tab[aria-selected="true"] { color: var(--fg-primary); border-bottom-color: var(--color-bg-indicator); }
+/* The sliding rule sits on the rule of the tab bar, where the static one was. */
+.tabs .indicator { bottom: calc(var(--border-width) * -1); }
+.tabs.has-indicator .tab[aria-selected="true"] { border-bottom-color: transparent; }
+.tab-count { color: var(--fg-muted); font-size: var(--font-size-label); }
+
+.segments { position: relative; display: inline-flex; border: var(--border-width) solid var(--border-strong); border-radius: var(--radius); }
+.segment { position: relative; z-index: 1; height: var(--size-control-s); padding: 0 var(--space-3); color: var(--fg-muted); border-right: var(--border-width) solid var(--border-strong); }
+.segment:last-child { border-right: 0; }
+.segment:hover { color: var(--fg-primary); }
+.segment[aria-pressed="true"] { color: var(--fg-inverted); background: var(--color-bg-indicator-segment); }
+/* The thumb slides under the labels, and the label changes colour at the same pace. */
+.segments .indicator { top: 0; height: auto; background: var(--color-bg-indicator-segment); }
+.segments.has-indicator .segment { transition-duration: var(--dur-base); }
+.segments.has-indicator .segment[aria-pressed="true"] { background: none; }
+
+/* Findings: severity, what and where, proof, since when, risk. */
+
+.table { border-top: var(--border-width) solid var(--border-strong); }
+
+.row,
+.row-head,
+.row-skeleton {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 176px 132px 72px;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: calc(var(--size-row) + var(--space-2));
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.row-head { min-height: var(--size-row-head); }
+button.row:hover { background: var(--color-bg-row-hover); }
+button.row:active { background: var(--color-bg-row-pressed); }
+/* A critical or exploited finding: the only tinted thing on this screen. */
+.row.critical, .row.critical:hover { background: var(--color-bg-row-critical); }
+.row.quiet { color: var(--fg-muted); }
+.row-what { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-3); min-width: 0; }
+.row-where { color: var(--fg-muted); overflow-wrap: anywhere; }
+.row-proof, .row-since { color: var(--fg-secondary); }
+.row-proof.text-alert { color: var(--accent-fg); }
+.row-since b { color: var(--fg-primary); font-weight: var(--font-weight-medium); }
+.after-table { margin-top: calc(var(--space-4) * -1); }
+
+.empty { display: grid; gap: var(--space-1); padding: var(--space-8) var(--space-3); border-bottom: var(--border-width) solid var(--border-subtle); }
+
+/* Ports and facts */
+
+.ports { width: 100%; margin-top: var(--space-5); border-top: var(--border-width) solid var(--border-strong); }
+.ports th { height: var(--size-row-head); padding: 0 var(--space-4) 0 0; text-align: left; border-bottom: var(--border-width) solid var(--border-subtle); }
+.ports td { height: var(--size-row); padding: 0 var(--space-4) 0 0; border-bottom: var(--border-width) solid var(--border-subtle); }
+.ports th.num, .ports td.num { width: 72px; text-align: right; }
+.ports tbody tr:hover { background: var(--color-bg-row-hover); }
+
+.state { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.facts div { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: var(--border-width) solid var(--border-subtle); }
+.facts div:last-child { border-bottom: 0; }
+.facts dt { flex: none; }
+.facts dd { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+
+.runtime { display: grid; gap: var(--space-3); padding-top: var(--space-5); border-top: var(--border-width) solid var(--border-subtle); }
+.runtime summary { min-height: var(--size-target); color: var(--fg-secondary); line-height: var(--size-target); cursor: pointer; }
+.runtime > * + * { margin-top: var(--space-3); }
+.checks li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: var(--size-row); border-bottom: var(--border-width) solid var(--border-subtle); }
+.checks li:last-child { border-bottom: 0; }
+
+/* Journal */
+
+.trend { display: grid; gap: var(--space-4); padding-bottom: var(--space-8); border-bottom: var(--border-width) solid var(--border-subtle); }
+.trend-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-6); }
+.trend-body { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-5) var(--space-12); }
+.trend-figure { display: flex; align-items: flex-end; gap: var(--space-4); }
+.trend-notes { display: grid; gap: var(--space-1); padding-bottom: var(--space-2); }
+.trend-chart { display: grid; gap: var(--space-3); }
+
+.timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-4);
+  min-height: var(--size-row);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  isolation: isolate;
+}
+
+/* A line that just arrived keeps a tint that fades out. Opacity only. */
+.timeline li.arrived::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0 calc(var(--space-2) * -1);
+  background: var(--color-bg-row-new);
+  opacity: 0;
+  animation: fade-out var(--dur-tint) var(--ease-out);
+  content: "";
+}
+
+.log li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); min-height: var(--size-row); padding: var(--space-2) 0; border-bottom: var(--border-width) solid var(--border-subtle); }
+.log li:last-child { border-bottom: 0; }
+
+.compare { display: grid; gap: var(--space-2); margin-top: var(--space-7); }
+.compare-row { display: flex; gap: var(--space-2); }
+.compare-row select { min-width: 0; max-width: 260px; }
+.compare-result { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-4); padding-top: var(--space-3); margin-top: var(--space-2); border-top: var(--border-width) solid var(--border-subtle); }
+.compare-result div { display: grid; gap: var(--space-1); align-content: start; }
+
+@media (max-width: 640px) {
+  .tabs { overflow-x: auto; }
+  /* A bar that scrolls clips what hangs under it: the rule stays inside. */
+  .tabs .indicator { bottom: 0; }
+  .row-head { display: none; }
+
+  /* A table becomes a list: what and risk first, the rest underneath. */
+  .row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "what what risk"
+      "severity proof since";
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) 0;
+  }
+
+  .row > .severity { grid-area: severity; }
+  .row-what { grid-area: what; }
+  .row-proof { grid-area: proof; }
+  .row-since { grid-area: since; text-align: right; }
+  .row-risk { grid-area: risk; }
+  .row-skeleton { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-inline: 0; }
+  .row-skeleton .skeleton-cell:nth-child(n + 4) { display: none; }
+  .ports th.num, .ports td.num { width: 56px; }
+  /* The program may wrap, the two verdicts never do: a row stays one line. */
+  .ports th, .ports td { padding-right: var(--space-2); }
+  .ports td:nth-child(2) { overflow-wrap: anywhere; }
+  .ports td:nth-child(n + 3) { white-space: nowrap; }
+  .timeline li { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-half) var(--space-3); }
+  .timeline li > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .compare-result { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

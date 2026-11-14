@@ -1,0 +1,28 @@
+/*
+ * Level 1, global tokens: what a colour is.
+ *
+ * Raw values live here and nowhere else. Nothing outside the tokens folder may use these
+ * names: components go through the aliases of semantic.css.
+ *
+ * Ramps are built in HSL around a base colour: about ten points of lightness per step,
+ * more saturation away from 50 % lightness, and a slight shift of hue. Only the steps
+ * that have a role are shipped; the full ramps are in docs/design/tokens.md.
+ */
+
+:root {
+  /* Neutrals: near-black with a trace of warmth, hue 30 to 36. */
+  --neutral-50: #f2f0ee; /* hsl(36 12% 94%)  primary text, brightest glyphs */
+  --neutral-200: #c2bdb7; /* hsl(34 8% 74%)   secondary text */
+  --neutral-400: #9a948d; /* hsl(32 6% 58%)   muted text, labels */
+  --neutral-500: #5c5751; /* hsl(30 6% 34%)   strong rule, dim marks */
+  --neutral-600: #34302d; /* hsl(30 7% 19%)   subtle rule */
+  --neutral-700: #1e1c1a; /* hsl(30 8% 11%)   hovered row, drawer */
+  --neutral-800: #131210; /* hsl(30 9% 7%)    raised surface */
+  --neutral-900: #0b0a09; /* hsl(30 10% 4%)   page background */
+
+  /* Vermilion: the only colour. Base at 500. */
+  --red-400: #f37359; /* hsl(10 86% 65%)  accent as text */
+  --red-500: #ed4a31; /* hsl(8 84% 56%)   accent as a mark */
+  --red-600: #d52d1a; /* hsl(6 78% 47%)   mid hot glyphs */
+  --red-800: #751815; /* hsl(2 70% 27%)   dim hot glyphs */
+}

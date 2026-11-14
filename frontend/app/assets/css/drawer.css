@@ -1,0 +1,59 @@
+/*
+ * The finding drawer. It floats, so it is the only element with a shadow.
+ */
+
+.drawer-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  background: var(--bg-scrim);
+}
+
+.drawer {
+  position: fixed;
+  z-index: 31;
+  inset: 0 0 0 auto;
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  width: min(520px, 100vw);
+  padding: var(--space-5) var(--space-6) var(--space-12);
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border-left: var(--border-width) solid var(--border-subtle);
+  box-shadow: var(--shadow-floating);
+}
+
+.drawer-head { display: flex; align-items: center; justify-content: space-between; }
+.drawer-title { overflow-wrap: anywhere; }
+.drawer-block { display: grid; gap: var(--space-2); }
+.drawer-block .field { width: 100%; }
+.drawer-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+.duration { display: flex; align-items: center; gap: var(--space-3); }
+.duration .field { width: auto; }
+
+/* Its content follows it in, one block after the other. */
+.drawer > * {
+  animation: rise var(--dur-base) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 6) * var(--dur-stagger));
+}
+
+.drawer > :nth-child(1) { --i: 0; }
+.drawer > :nth-child(2) { --i: 1; }
+.drawer > :nth-child(3) { --i: 2; }
+.drawer > :nth-child(4) { --i: 3; }
+.drawer > :nth-child(5) { --i: 4; }
+.drawer > :nth-child(6) { --i: 5; }
+
+/* It fades in and travels a few pixels. Opacity and transform only. */
+.loupe-enter-active,
+.loupe-leave-active { transition: opacity var(--dur-base) var(--ease-out); }
+
+.loupe-enter-active .drawer,
+.loupe-leave-active .drawer { transition: transform var(--dur-base) var(--ease-out); }
+
+.loupe-enter-from,
+.loupe-leave-to { opacity: 0; }
+
+.loupe-enter-from .drawer,
+.loupe-leave-to .drawer { transform: translateX(var(--motion-distance)); }

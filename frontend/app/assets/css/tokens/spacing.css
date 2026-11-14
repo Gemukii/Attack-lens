@@ -1,0 +1,44 @@
+/*
+ * Spacing, sizes and shapes. The scale is in steps of 4 px, with one half step for
+ * optical adjustments. A margin, a padding or a gap is always one of these.
+ */
+
+:root {
+  --space-half: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-11: 44px;
+  --space-12: 48px;
+
+  /* Grid: 12 columns in a container of 1440 px at most. Beyond it only the margins grow. */
+  --size-container: 1440px;
+  /* The smallest thing a finger or a pointer has to hit (WCAG 2.2, target size). */
+  --size-target: 24px;
+  --gutter: var(--space-6);
+  --panel-pad: var(--space-5);
+
+  /* Controls and rows */
+  --size-control: 32px;
+  --size-control-s: 28px;
+  --size-row: 36px;
+  --size-row-head: 32px;
+  --size-topbar: 56px;
+
+  --border-width: 1px;
+  --radius: 2px;
+  --radius-round: 50%;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: var(--space-4);
+    --panel-pad: var(--space-4);
+  }
+}

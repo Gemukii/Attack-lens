@@ -1,0 +1,101 @@
+/*
+ * Typography: two families, two weights, and styles named by level.
+ *
+ * IBM Plex Sans carries the reading. IBM Plex Mono carries raw data (ports, addresses,
+ * processes, commands, timestamps) and the glyph field, so data and image share a face.
+ * Both are bundled with the application: see nuxt.config.ts and ADR-0010.
+ */
+
+:root {
+  --font-sans: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+
+  --font-size-display: 136px;
+  --font-size-heading-l: 30px;
+  --font-size-heading-m: 19px;
+  --font-size-data-l: 24px;
+  --font-size-body-m: 14px;
+  --font-size-body-s: 13px;
+  --font-size-data: 13px;
+  --font-size-label: 11px;
+  /* Mono looks larger than sans at the same size: inline code is set a little smaller. */
+  --font-size-code-inline: 0.93em;
+
+  /* One line of figures: a tight leading keeps the note attached to its number. */
+  --line-height-display: 0.9;
+  --line-height-heading: 1.2;
+  --line-height-label: 1.4;
+  --line-height-body: 1.5;
+
+  --tracking-display: -0.045em;
+  --tracking-heading: -0.01em;
+  --tracking-label: 0.08em;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --font-size-display: 104px;
+    --font-size-heading-l: 26px;
+  }
+}
+
+/* The named styles. A component picks one of these rather than setting sizes of its own. */
+
+.t-display {
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.t-heading-l {
+  font-size: var(--font-size-heading-l);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+
+.t-heading-m {
+  font-size: var(--font-size-heading-m);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-heading);
+  text-wrap: pretty;
+}
+
+.t-body-m {
+  font-size: var(--font-size-body-m);
+  line-height: var(--line-height-body);
+  text-wrap: pretty;
+}
+
+.t-body-s {
+  font-size: var(--font-size-body-s);
+  line-height: var(--line-height-body);
+}
+
+.t-label {
+  color: var(--fg-muted);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.t-data {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-data);
+  line-height: var(--line-height-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.t-data-l {
+  font-size: var(--font-size-data-l);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-heading);
+  font-variant-numeric: tabular-nums;
+}

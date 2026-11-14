@@ -1,0 +1,139 @@
+{
+  "id": "no-agent",
+  "label": "No agent, network view only",
+  "description": "Scans run from the Docker container. No inside view: attack paths, firewall and account are not measured. One finding is still urgent.",
+  "extends": "empty",
+  "responses": {
+    "results": {
+      "scan_id": "demo-outside-04",
+      "target": "host.docker.internal",
+      "scan_type": "network",
+      "status": "complete",
+      "completed_at": "@-35m",
+      "duration_seconds": 3.6,
+      "score": 46,
+      "raw_score": 46,
+      "vantage": "container",
+      "coverage": { "ports_checked": 36, "ports_open": 4, "ports_closed": 32, "ports_filtered": 0 },
+      "open_ports": [445, 3389, 6379, 8080],
+      "findings": [
+        {
+          "finding_id": "demo-out-6379",
+          "target": "host.docker.internal",
+          "category": "network",
+          "severity": "critical",
+          "title": "Redis service detected",
+          "description": "TCP port 6379 is accepting connections, and Redis answers commands without a password.",
+          "evidence": "host.docker.internal:6379/tcp",
+          "remediation": "Bind Redis to the loopback address and require a password.",
+          "risk_reason": "A database exposed on the network increases the risk of data compromise.",
+          "port": 6379,
+          "service": "Redis",
+          "protocol": "tcp",
+          "version": "7.2.4",
+          "banner": "+PONG",
+          "verification": "confirmed",
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 60, "priority": "now", "impact": 1.0, "reachability": "no network path", "exploitability": "confirmed by an active check" }
+        },
+        {
+          "finding_id": "demo-out-3389",
+          "target": "host.docker.internal",
+          "category": "network",
+          "severity": "high",
+          "title": "RDP service detected",
+          "description": "TCP port 3389 is accepting connections.",
+          "evidence": "host.docker.internal:3389/tcp",
+          "remediation": "Restrict RDP to a VPN or to trusted networks, and require Network Level Authentication.",
+          "risk_reason": "RDP is a frequent target of password guessing and of remote code execution flaws.",
+          "port": 3389,
+          "service": "RDP",
+          "protocol": "tcp",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 29, "priority": "soon", "impact": 0.8, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-out-445",
+          "target": "host.docker.internal",
+          "category": "network",
+          "severity": "high",
+          "title": "SMB service detected",
+          "description": "TCP port 445 is accepting connections.",
+          "evidence": "host.docker.internal:445/tcp",
+          "remediation": "Restrict SMB to trusted networks and block inbound Internet access.",
+          "risk_reason": "SMB exposure can enable file-sharing attacks and lateral movement.",
+          "port": 445,
+          "service": "SMB",
+          "protocol": "tcp",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 29, "priority": "soon", "impact": 0.8, "reachability": "no network path", "exploitability": "assumed" }
+        },
+        {
+          "finding_id": "demo-out-8080",
+          "target": "host.docker.internal",
+          "category": "network",
+          "severity": "low",
+          "title": "HTTP alternate service detected",
+          "description": "TCP port 8080 is accepting connections.",
+          "evidence": "host.docker.internal:8080/tcp",
+          "remediation": "Prefer HTTPS and verify that the service is intentionally public.",
+          "risk_reason": "HTTP traffic is unencrypted and can expose transmitted information.",
+          "port": 8080,
+          "service": "HTTP alternate",
+          "protocol": "tcp",
+          "banner": "HTTP/1.1 200 OK Server: nginx/1.27.1",
+          "verification": null,
+          "known_exploited": false,
+          "triage_status": "open",
+          "risk": { "score": 9, "priority": "later", "impact": 0.25, "reachability": "no network path", "exploitability": "assumed" }
+        }
+      ]
+    },
+    "scans": [
+      { "scan_id": "demo-outside-04", "target": "host.docker.internal", "scan_type": "network", "status": "complete", "completed_at": "@-35m", "score": 46, "findings": [] },
+      { "scan_id": "demo-outside-03", "target": "host.docker.internal", "scan_type": "network", "status": "complete", "completed_at": "@-4d", "score": 60, "findings": [] },
+      { "scan_id": "demo-outside-02", "target": "host.docker.internal", "scan_type": "network", "status": "complete", "completed_at": "@-11d", "score": 60, "findings": [] }
+    ],
+    "compare": {
+      "before_id": "demo-outside-03",
+      "after_id": "demo-outside-04",
+      "score_delta": -14,
+      "finding_count_delta": 2,
+      "new_findings": [
+        { "finding_id": "demo-out-6379", "severity": "critical", "title": "Redis service detected", "port": 6379 },
+        { "finding_id": "demo-out-8080", "severity": "low", "title": "HTTP alternate service detected", "port": 8080 }
+      ],
+      "fixed_findings": [],
+      "persistent_findings": [
+        { "finding_id": "demo-out-3389", "severity": "high", "title": "RDP service detected", "port": 3389 },
+        { "finding_id": "demo-out-445", "severity": "high", "title": "SMB service detected", "port": 445 }
+      ],
+      "ports_added": [6379, 8080],
+      "ports_removed": []
+    },
+    "alerts": [
+      {
+        "alert_id": 12,
+        "scan_id": "demo-outside-04",
+        "target": "host.docker.internal",
+        "created_at": "@-35m",
+        "message": "AttackLens: 2 new findings on host.docker.internal",
+        "delivered": true,
+        "findings": [
+          { "finding_id": "demo-out-6379", "severity": "critical", "title": "Redis service detected", "port": 6379 },
+          { "finding_id": "demo-out-8080", "severity": "low", "title": "HTTP alternate service detected", "port": 8080 }
+        ]
+      }
+    ],
+    "audit": [
+      { "entry_id": 31, "at": "@-35m", "actor": "dashboard", "action": "scan_ordered", "detail": "host.docker.internal" },
+      { "entry_id": 30, "at": "@-4d", "actor": "dashboard", "action": "scan_ordered", "detail": "host.docker.internal" },
+      { "entry_id": 29, "at": "@-11d", "actor": "dashboard", "action": "scan_ordered", "detail": "host.docker.internal" }
+    ]
+  }
+}

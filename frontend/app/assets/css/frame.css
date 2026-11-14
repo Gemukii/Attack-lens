@@ -1,0 +1,137 @@
+/*
+ * The frame, on every screen: top bar, reading line, notices, footer.
+ * It keeps its place and its height whatever the data says, so nothing under it moves.
+ */
+
+.topbar {
+  view-transition-name: topbar;
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  background: var(--bg-base);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+  min-height: var(--size-topbar);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-target);
+  font-size: var(--font-size-body-m);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.views { position: relative; display: flex; flex: 1; align-self: stretch; gap: var(--space-1); }
+
+.views button {
+  padding: 0 var(--space-3);
+  color: var(--fg-muted);
+  font-size: var(--font-size-body-s);
+  border-bottom: var(--border-width) solid transparent;
+}
+
+.views button:hover { color: var(--fg-secondary); }
+.views button[aria-current="page"] { color: var(--fg-primary); border-bottom-color: var(--color-bg-indicator); }
+.views.has-indicator button[aria-current="page"] { border-bottom-color: transparent; }
+
+.scan { display: flex; gap: var(--space-2); }
+.scan .field { width: 180px; }
+
+/* A link that stands alone is tall enough to hit. One inside a sentence keeps its line. */
+.footer .link { display: inline-flex; align-items: center; min-height: var(--size-target); }
+
+/* The reading line: who measured what, when and from where. Same place on every view. */
+.reading-line {
+  view-transition-name: reading-line;
+  background: var(--bg-elevated);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+/* Fixed columns: an item never moves when its value arrives or changes. */
+.reading {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 1fr 1.2fr 1fr 1.3fr;
+  align-items: center;
+  gap: var(--space-2) var(--space-6);
+  height: var(--size-row);
+}
+
+.reading-item { position: relative; display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; white-space: nowrap; isolation: isolate; }
+.reading-item dd { min-width: 0; overflow: hidden; color: var(--fg-secondary); text-overflow: ellipsis; }
+.reading-item .lamp { vertical-align: 0.05em; }
+.reading-item .skeleton { display: inline-block; vertical-align: middle; }
+.reading-item.alert dd { color: var(--accent-fg); }
+
+/* A fact that was just replaced: its value fades in again and keeps a tint for a moment. */
+.reading-item.changed dd { animation: fade-in var(--dur-slow) var(--ease-out); }
+
+.reading-item.changed::before {
+  position: absolute;
+  z-index: -1;
+  inset: calc(var(--space-1) * -1) calc(var(--space-2) * -1);
+  background: var(--color-bg-reading-changed);
+  opacity: 0;
+  /* It holds for a moment before it fades, so the eye has time to find it. */
+  animation: fade-out var(--dur-flash) var(--ease-in-out);
+  content: "";
+}
+
+/* Notices: an error, or a command to run on another machine. */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--size-row);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-6);
+  background: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.notice-error { border-color: var(--accent); }
+.notice-text { flex: 1; min-width: 0; color: var(--fg-secondary); overflow-wrap: anywhere; }
+.notice-error .notice-text { color: var(--fg-primary); }
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2) var(--space-6);
+  padding-block: var(--space-4) var(--space-7);
+  border-top: var(--border-width) solid var(--border-subtle);
+}
+
+@media (max-width: 1100px) {
+  .reading {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    height: calc(var(--size-row) * 2);
+    align-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-inner { flex-wrap: wrap; gap: 0 var(--space-3); padding-top: var(--space-2); }
+  .wordmark { flex: 1; }
+  .scan { order: 2; flex-basis: 100%; margin-top: var(--space-2); }
+  .scan .field { flex: 1; width: auto; min-width: 0; }
+  .views { order: 3; flex-basis: 100%; height: var(--size-row); margin-left: calc(var(--space-3) * -1); overflow-x: auto; }
+
+  /* Three rows of two, each value on one line: the height never depends on the text. */
+  .reading {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    height: calc(var(--size-row) * 3 + var(--space-4));
+  }
+
+  .reading-item { display: grid; gap: 0; }
+  .reading-item dd { height: calc(var(--font-size-body-s) * var(--line-height-body)); white-space: nowrap; }
+  .footer { justify-content: flex-start; }
+}

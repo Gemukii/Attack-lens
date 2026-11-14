@@ -1,0 +1,100 @@
+/*
+ * Demo mode banner. Loaded in development only, with ATTACKLENS_DEMO=1.
+ *
+ * Light on dark so it cannot be missed, and never in the alert colour: a demo is not a threat.
+ * It sticks to the bottom edge of the window: always on screen, and it never moves the layout
+ * under test. In a full-page capture it sits at the end of the page.
+ */
+
+.demo-banner {
+  position: sticky;
+  z-index: 100;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  min-height: var(--size-row);
+  padding: var(--space-1) var(--space-4);
+  color: var(--fg-inverted);
+  font-size: var(--font-size-body-s);
+  line-height: var(--line-height-label);
+  background: var(--fg-primary);
+}
+
+.demo-banner strong {
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.demo-banner-note {
+  flex: 1;
+  min-width: 0;
+}
+
+.demo-banner-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* A fixed width: the list is filled after load and must not move anything. */
+.demo-banner select {
+  width: 280px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.demo-banner select,
+.demo-banner button {
+  height: var(--space-6);
+  padding: 0 var(--space-2);
+  color: var(--fg-inverted);
+  font-size: var(--font-size-body-s);
+  background: transparent;
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.demo-banner select:focus-visible,
+.demo-banner button:focus-visible {
+  outline-color: var(--fg-inverted);
+}
+
+/* The banner takes one row at the bottom of the window: the page gives it up, so its footer stays visible. */
+.page,
+.gate {
+  min-height: calc(100vh - var(--size-row));
+}
+
+@media (max-width: 640px) {
+  .demo-banner {
+    flex-wrap: nowrap;
+    gap: var(--space-2);
+  }
+
+  .demo-banner strong {
+    flex: none;
+  }
+
+  .demo-banner-note {
+    display: none;
+  }
+
+  .demo-banner-field {
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .demo-banner-field span {
+    display: none;
+  }
+}
+
+@media print {
+  .demo-banner {
+    position: static;
+  }
+}

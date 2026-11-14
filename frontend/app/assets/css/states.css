@@ -1,0 +1,54 @@
+/*
+ * States: loading, and the two pages outside the dashboard (login, error).
+ */
+
+/* A skeleton is still. Each block has the size of what it stands for, so nothing moves
+   when the content arrives. */
+.skeleton {
+  display: block;
+  background: var(--color-bg-skeleton);
+  border-radius: var(--radius);
+}
+
+.skeleton-label { width: 140px; height: var(--font-size-label); }
+.skeleton-value { width: 96px; height: var(--font-size-body-s); }
+.skeleton-figure { width: 96px; height: calc(var(--font-size-display) * var(--line-height-display)); }
+.skeleton-title { width: min(320px, 100%); height: calc(var(--font-size-heading-l) * var(--line-height-heading)); }
+.skeleton-line { width: min(420px, 100%); height: var(--font-size-body-m); }
+.skeleton-action { width: 100%; height: 132px; }
+/* The proportions of the field: its columns by its rows. */
+.skeleton-bench { width: 100%; aspect-ratio: 5 / 2; margin-top: var(--space-3); }
+.skeleton-row { width: 100%; height: var(--size-row); margin-bottom: var(--space-2); }
+.skeleton-trend { width: 100%; height: 180px; }
+.skeleton-cell { height: var(--font-size-label); }
+.skeleton-cell.wide { width: 60%; }
+
+/* Login and error: the field of characters behind an opaque panel. No text sits on a glyph. */
+.gate {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--bg-base);
+}
+
+.backdrop { position: fixed; inset: 0; pointer-events: none; }
+.ascii-field { overflow: hidden; }
+.ascii-field canvas { display: block; width: 100%; height: 100%; }
+
+.gate-panel {
+  position: relative;
+  display: grid;
+  gap: var(--space-5);
+  width: min(340px, 100%);
+  padding: var(--space-6);
+  background: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.gate-panel .wordmark { font-size: var(--font-size-heading-m); }
+.gate-panel .btn-primary { justify-self: start; }
+.gate-field { display: grid; gap: var(--space-2); }
+.gate-field .field { width: 100%; }
+.gate-failure { display: flex; align-items: center; color: var(--fg-secondary); }

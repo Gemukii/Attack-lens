@@ -1,0 +1,52 @@
+/*
+ * Level 2, alias tokens: what a colour does.
+ *
+ * This is the only vocabulary components may use for colour. A second theme is a second
+ * block that rewires these names, without touching a component.
+ *
+ * The accent has one meaning on every screen: a proved way to full control, or a critical
+ * or exploited finding. It is never an action and never a decoration.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg-base: var(--neutral-900);
+  --bg-elevated: var(--neutral-800);
+  --bg-overlay: var(--neutral-700);
+  /* A surface under a finger, or one whose value was just replaced. */
+  --bg-active: color-mix(in srgb, var(--neutral-600) 50%, var(--neutral-700));
+  --bg-critical: color-mix(in srgb, var(--red-500) 14%, var(--neutral-900));
+  --bg-scrim: color-mix(in srgb, var(--neutral-900) 72%, transparent);
+
+  /* Text */
+  --fg-primary: var(--neutral-50);
+  --fg-secondary: var(--neutral-200);
+  --fg-muted: var(--neutral-400);
+  --fg-inverted: var(--neutral-900);
+
+  /* Rules */
+  --border-subtle: var(--neutral-600);
+  --border-strong: var(--neutral-500);
+
+  /* Accent and severity. Severity is an intensity, and red only at the top. */
+  --accent: var(--red-500);
+  --accent-fg: var(--red-400);
+  --severity-critical: var(--red-500);
+  --severity-high: var(--neutral-50);
+  --severity-medium: var(--neutral-200);
+  --severity-low: var(--neutral-400);
+
+  /* The glyph field: four tones of light, three of heat. */
+  --field-1: var(--neutral-500);
+  --field-2: var(--neutral-400);
+  --field-3: var(--neutral-200);
+  --field-4: var(--neutral-50);
+  --field-hot-1: var(--red-800);
+  --field-hot-2: var(--red-600);
+  --field-hot-3: var(--red-500);
+
+  /* Floating elements only: the drawer. */
+  --shadow-floating: 0 8px 24px color-mix(in srgb, var(--neutral-900) 50%, transparent);
+}
